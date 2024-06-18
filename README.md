@@ -70,3 +70,22 @@ this.logger.log('Some log message')
 Docs: https://www.npmjs.com/package/nest-winston
 
 ## Graphql Gateway
+
+### Generating supergraph
+
+For generating a supergraph file, which is a combination of all subgraphs, we use `rover`. Following command builds the supergraph file:
+
+```shell
+npx -p @apollo/rover rover supergraph compose --config ./supergraph-config.yml --output supergraph.graphql
+```
+
+In `supergraph-config.yml` we should include all subgraph services, based on following config:
+
+```yml
+federation_version: 2
+subgraphs:
+  constellation: # A service name
+    routing_url: http://localhost:3001/graphql #Subgraph endpoint
+    schema:
+      subgraph_url: http://localhost:3001/graphql #Subgraph schema
+```
