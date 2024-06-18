@@ -17,7 +17,8 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "DOTENV_CONFIG_PATH=.env jest --runInBand --detectOpenHandles --config ./test/jest-e2e.json"
+    "test:e2e": "DOTENV_CONFIG_PATH=.env jest --runInBand --detectOpenHandles --config ./test/jest-e2e.json",
+    "supergraph": "npx -p @apollo/rover rover supergraph compose --config ./supergraph-config.yml --output supergraph.graphql"
   },
   "dependencies": {
     "@apollo/gateway": "^2.7.1",
@@ -37,6 +38,7 @@
     "winston": "^3.13.0"
   },
   "devDependencies": {
+    "@apollo/rover": "^0.23.0",
     "@nestjs/cli": "^10.0.0",
     "@nestjs/schematics": "^10.0.0",
     "@nestjs/testing": "^10.0.0",
