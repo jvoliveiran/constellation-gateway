@@ -5,7 +5,7 @@ import { resourceFromAttributes } from '@opentelemetry/resources';
 import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions';
 
 // Reads process.env directly because this file runs as a top-level import
-// (before NestJS boots), so ConfigService and Joi validation are not yet available.
+// (before NestJS boots), so ConfigService and Zod validation are not yet available.
 const isDisabled = process.env.OTEL_SDK_DISABLED === 'true';
 
 let sdk: NodeSDK | undefined;

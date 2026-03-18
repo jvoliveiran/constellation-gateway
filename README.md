@@ -46,12 +46,12 @@ npm run dev
 | Health checks | @nestjs/terminus | 10.x |
 | Rate limiting | @nestjs/throttler | 6.x |
 | Security headers | helmet | 8.x |
-| Config validation | Joi | 18.x |
+| Config validation | Zod | 4.x |
 | Testing | Jest + ts-jest + Supertest | 29.x |
 
 ### Environment
 
-All environment variables are validated at startup via Joi. The application refuses to start if required variables are missing or malformed.
+All environment variables are validated at startup via Zod. The application refuses to start if required variables are missing or malformed.
 
 | Variable | Type | Default | Required | Description |
 |----------|------|---------|----------|-------------|
@@ -186,7 +186,7 @@ npm run test:e2e      # E2E tests
 - **TypeScript**: Strict mode enabled (`strict: true`)
 - **Linting**: ESLint with `@typescript-eslint/recommended`, `no-explicit-any: warn`, `no-unused-vars: error`
 - **Formatting**: Prettier (single quotes, trailing commas)
-- **Config validation**: Joi schema validates all env vars at startup
+- **Config validation**: Zod schema validates all env vars at startup
 - **Graceful shutdown**: `enableShutdownHooks()` drains in-flight requests on SIGTERM/SIGINT
 
 ### Supergraph composition (Rover)
@@ -220,7 +220,7 @@ SUBGRAPH=<name>|<url>[,<name>|<url>,...]
 - `name` — an alphanumeric identifier (supports hyphens and underscores: `[\w-]+`)
 - `url` — the full HTTP(S) URL to the subgraph's GraphQL endpoint
 - Entries are separated by commas (no spaces around the comma)
-- Validated at startup via Joi — the gateway refuses to start if the format is invalid
+- Validated at startup via Zod — the gateway refuses to start if the format is invalid
 
 #### Single Subgraph
 
@@ -350,7 +350,7 @@ constellation-gateway/
 │   │   └── gql-throttler.guard.ts         # GraphQL-aware throttler guard
 │   ├── config/
 │   │   ├── config.types.ts                # GatewayConfig interface
-│   │   ├── config.validation.ts           # Joi validation schema
+│   │   ├── config.validation.ts           # Zod validation schema
 │   │   └── configuration.ts               # Typed config factory (registerAs)
 │   ├── health/
 │   │   ├── health.module.ts               # Terminus + HTTP module

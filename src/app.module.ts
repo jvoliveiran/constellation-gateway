@@ -17,7 +17,7 @@ import * as winston from 'winston';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { GqlThrottlerGuard } from './common/gql-throttler.guard';
-import { validationSchema } from './config/config.validation';
+import { validate } from './config/config.validation';
 import gatewayConfig from './config/configuration';
 import { GatewayConfig } from './config/config.types';
 import { CorrelationIdMiddleware } from './common/correlation-id.middleware';
@@ -28,14 +28,13 @@ import { MetricsModule } from './metrics/metrics.module';
     ConfigModule.forRoot({
       isGlobal: true,
       load: [gatewayConfig],
-      validationSchema,
-      validationOptions: { abortEarly: false },
+      validate,
     }),
     GraphQLModule.forRootAsync<ApolloGatewayDriverConfig>({
       driver: ApolloGatewayDriver,
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => {
-        // Config is guaranteed by Joi validation at startup
+        // Config is guaranteed by Zod validation at startup
         const config =
           configService.get<GatewayConfig>('gateway') as GatewayConfig;
         const { subgraphs, queryMaxDepth: maxDepth, nodeEnv } = config;
