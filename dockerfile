@@ -22,13 +22,12 @@ FROM node:20-alpine
 # Set the working directory in the container
 WORKDIR /app
 
-# Install production dependencies
+# Install production dependencies only (deterministic via lockfile)
 COPY package*.json ./
-RUN npm install --only=production
+RUN npm ci --omit=dev
 
 # Copy the build output from the build stage
 COPY --from=build /app/dist ./dist
-COPY --from=build /app/node_modules ./node_modules
 
 # Expose the port the app runs on
 EXPOSE 3000

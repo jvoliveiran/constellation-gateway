@@ -1,134 +1,183 @@
 import { IntrospectAndCompose, RemoteGraphQLDataSource } from '@apollo/gateway';
 import { ApolloGatewayDriver, ApolloGatewayDriverConfig } from '@nestjs/apollo';
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { GraphQLModule } from '@nestjs/graphql';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
+import { ApolloServerPluginLandingPageDisabled } from '@apollo/server/plugin/disabled';
+import depthLimit from 'graphql-depth-limit';
+import { GraphQLFormattedError } from 'graphql';
 import {
   utilities as nestWinstonModuleUtilities,
   WinstonModule,
 } from 'nest-winston';
 import * as winston from 'winston';
-// TODO: install jsonwebtoken
-//import { verify, decode } from 'jsonwebtoken';
 import { HealthModule } from './health/health.module';
-
-// https://github.com/tkssharma/nestjs-with-apollo-federation-gateway/blob/main/packages/getway-service/src/app.module.ts
-// const getToken = (authToken: string): string => {
-//   console.log(authToken);
-//   const match = authToken.match(/^Bearer (.*)$/);
-//   if (!match || match.length < 2) {
-//     throw new HttpException(
-//       { message: INVALID_BEARER_TOKEN },
-//       HttpStatus.UNAUTHORIZED,
-//     );
-//   }
-//   console.log(match[1]);
-//   return match[1];
-// };
-
-// const decodeToken = (tokenString: string) => {
-//   // TODO: Add secret key
-//   const decoded = decode(tokenString, process.env.SECRET_KEY);
-//   if (!decoded) {
-//     throw new HttpException(
-//       { message: INVALID_AUTH_TOKEN },
-//       HttpStatus.UNAUTHORIZED,
-//     );
-//   }
-//   return decoded;
-// };
-
-// const handleAuth = ({ req }) => {
-//   try {
-//     if (req.headers.authorization) {
-//       const token = getToken(req.headers.authorization);
-//       const verified = verify(token, process.env.SECRET_KEY);
-//       if (!verified) {
-//         throw new HttpException(
-//           { message: INVALID_AUTH_TOKEN },
-//           HttpStatus.UNAUTHORIZED,
-//         );
-//       }
-//       const decoded: any = decodeToken(token);
-//       return {
-//         userId: decoded.userId,
-//         permissions: decoded.permissions,
-//         authorization: `${req.headers.authorization}`,
-//       };
-//     }
-//   } catch (err) {
-//     throw new UnauthorizedException(
-//       'User unauthorized with invalid authorization Headers',
-//     );
-//   }
-// };
+import { AuthModule } from './auth/auth.module';
+import { GqlThrottlerGuard } from './common/gql-throttler.guard';
+import { validationSchema } from './config/config.validation';
+import gatewayConfig from './config/configuration';
+import { GatewayConfig } from './config/config.types';
+import { CorrelationIdMiddleware } from './common/correlation-id.middleware';
+import { MetricsModule } from './metrics/metrics.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      load: [gatewayConfig],
+      validationSchema,
+      validationOptions: { abortEarly: false },
     }),
     GraphQLModule.forRootAsync<ApolloGatewayDriverConfig>({
       driver: ApolloGatewayDriver,
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => {
-        // TODO: support multiple subgraphs separate by comma
-        const [subGraphName, subGraphHost] = configService
-          .get('SUBGRAPH')
-          .split('|');
+        // Config is guaranteed by Joi validation at startup
+        const config =
+          configService.get<GatewayConfig>('gateway') as GatewayConfig;
+        const { subgraphs, queryMaxDepth: maxDepth, nodeEnv } = config;
+        const isProduction = nodeEnv === 'production';
+
+        const plugins = isProduction
+          ? [ApolloServerPluginLandingPageDisabled()]
+          : [ApolloServerPluginLandingPageLocalDefault()];
+
         return {
           server: {
-            // TODO: uncoment
-            // context: handleAuth,
+            context: ({
+              req,
+            }: {
+              req: {
+                user?: { userId: string; permissions: string[] };
+                headers: Record<string, string>;
+              };
+            }) => ({
+              userId: req.user?.userId,
+              permissions: req.user?.permissions,
+              authorization: req.headers?.authorization,
+              correlationId: req.headers?.['x-correlation-id'],
+            }),
             playground: false,
-            plugins: [ApolloServerPluginLandingPageLocalDefault()],
+            plugins,
+            validationRules: [depthLimit(maxDepth)],
+            formatError: (
+              formattedError: GraphQLFormattedError,
+            ): GraphQLFormattedError => {
+              if (isProduction) {
+                return {
+                  message: formattedError.message,
+                  locations: formattedError.locations,
+                  path: formattedError.path,
+                  extensions: formattedError.extensions?.code
+                    ? { code: formattedError.extensions.code }
+                    : undefined,
+                };
+              }
+              return formattedError;
+            },
           },
           gateway: {
             buildService: ({ url }) => {
               return new RemoteGraphQLDataSource({
                 url,
-                willSendRequest({ request, context }: any) {
-                  request.http.headers.set('userId', context.userId);
-                  // for now pass authorization also
-                  request.http.headers.set(
-                    'authorization',
-                    context.authorization,
-                  );
-                  request.http.headers.set('permissions', context.permissions);
+                willSendRequest({ request, context }) {
+                  if (context.userId) {
+                    request.http?.headers.set('userId', context.userId);
+                  }
+                  if (context.authorization) {
+                    request.http?.headers.set(
+                      'authorization',
+                      context.authorization,
+                    );
+                  }
+                  if (context.permissions) {
+                    request.http?.headers.set(
+                      'permissions',
+                      JSON.stringify(context.permissions),
+                    );
+                  }
+                  if (context.correlationId) {
+                    request.http?.headers.set(
+                      'x-correlation-id',
+                      context.correlationId,
+                    );
+                  }
                 },
               });
             },
             supergraphSdl: new IntrospectAndCompose({
-              subgraphs: [{ name: subGraphName, url: subGraphHost }],
+              subgraphs,
             }),
           },
         };
       },
       inject: [ConfigService],
     }),
-    WinstonModule.forRoot({
-      level: 'debug',
-      transports: [
-        new winston.transports.Console({
-          debugStdout: true,
-          format: winston.format.combine(
-            winston.format.timestamp(),
-            winston.format.ms(),
-            nestWinstonModuleUtilities.format.nestLike(
-              'Constellation Gateway',
-              {
-                colors: true,
-                prettyPrint: true,
-              },
-            ),
-          ),
-        }),
-      ],
+    WinstonModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => {
+        const { nodeEnv, logLevel } =
+          configService.get<GatewayConfig>('gateway') as GatewayConfig;
+        const isProduction = nodeEnv === 'production';
+
+        const productionFormat = winston.format.combine(
+          winston.format.timestamp(),
+          winston.format.json(),
+        );
+
+        const developmentFormat = winston.format.combine(
+          winston.format.timestamp(),
+          winston.format.ms(),
+          nestWinstonModuleUtilities.format.nestLike('Constellation Gateway', {
+            colors: true,
+            prettyPrint: true,
+          }),
+        );
+
+        return {
+          level: logLevel,
+          defaultMeta: { service: 'constellation-gateway' },
+          transports: [
+            new winston.transports.Console({
+              debugStdout: true,
+              format: isProduction ? productionFormat : developmentFormat,
+            }),
+          ],
+        };
+      },
+      inject: [ConfigService],
+    }),
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => {
+        const { rateLimitTtl, rateLimitMax } =
+          configService.get<GatewayConfig>('gateway') as GatewayConfig;
+        return [
+          {
+            ttl: rateLimitTtl * 1000,
+            limit: rateLimitMax,
+          },
+        ];
+      },
+      inject: [ConfigService],
     }),
     HealthModule,
+    AuthModule,
+    MetricsModule,
   ],
   controllers: [],
-  providers: [],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: GqlThrottlerGuard,
+    },
+  ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(CorrelationIdMiddleware).forRoutes('*');
+  }
+}

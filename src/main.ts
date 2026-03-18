@@ -1,19 +1,40 @@
+import './tracing/tracing';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
+import helmet from 'helmet';
+import { shutdownTracing } from './tracing/tracing';
+import { GatewayConfig } from './config/config.types';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const configService = app.get(ConfigService);
+  const config = configService.get<GatewayConfig>('gateway');
+
+  app.use(helmet({ contentSecurityPolicy: false }));
+
   app.enableCors({
-    origin: ['http://localhost:3002'],
+    origin: config?.allowedOrigins || ['http://localhost:3002'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    methods: ['GET', 'POST', 'PUT', 'PATCH'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
   });
-  const configService = app.get(ConfigService);
-  app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
-  const port = configService.get('SERVICE_PORT');
-  await app.listen(port || 3000);
+
+  const logger = app.get(WINSTON_MODULE_NEST_PROVIDER);
+  app.useLogger(logger);
+  app.enableShutdownHooks();
+
+  const port = config?.port || 3000;
+  await app.listen(port);
+
+  const gracefulShutdown = async (signal: string) => {
+    logger.log(`Received ${signal}, shutting down gracefully...`);
+    await shutdownTracing();
+    await app.close();
+  };
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 bootstrap();

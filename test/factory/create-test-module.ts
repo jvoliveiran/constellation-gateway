@@ -1,11 +1,8 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { useContainer } from 'class-validator';
 import { AppModule } from '../../src/app.module';
-import { PrismaService } from '../../src/prisma/prisma.service';
 
 export const createTestModule = () => {
-  let prisma: PrismaService | null;
   let moduleFixture: TestingModule | null;
   let app: INestApplication | null;
 
@@ -15,16 +12,9 @@ export const createTestModule = () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(
-      new ValidationPipe({
-        forbidUnknownValues: false,
-      }),
-    );
-    useContainer(app.select(AppModule), { fallbackOnErrors: true });
-
     await app.init();
-    prisma = (await app.get(PrismaService)) as PrismaService;
-    return { prisma, app };
+
+    return { app };
   };
 
   const close = async () => {
@@ -32,7 +22,6 @@ export const createTestModule = () => {
     if (moduleFixture) await moduleFixture.close();
 
     app = null;
-    prisma = null;
     moduleFixture = null;
   };
 
