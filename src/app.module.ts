@@ -9,6 +9,7 @@ import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin
 import { ApolloServerPluginLandingPageDisabled } from '@apollo/server/plugin/disabled';
 import depthLimit from 'graphql-depth-limit';
 import { GraphQLFormattedError } from 'graphql';
+import { context as otelContext, propagation } from '@opentelemetry/api';
 import {
   utilities as nestWinstonModuleUtilities,
   WinstonModule,
@@ -22,6 +23,7 @@ import gatewayConfig from './config/configuration';
 import { GatewayConfig } from './config/config.types';
 import { CorrelationIdMiddleware } from './common/correlation-id.middleware';
 import { MetricsModule } from './metrics/metrics.module';
+import { OtelWinstonTransport } from './observability/otel-winston-transport';
 
 @Module({
   imports: [
@@ -83,6 +85,11 @@ import { MetricsModule } from './metrics/metrics.module';
               return new RemoteGraphQLDataSource({
                 url,
                 willSendRequest({ request, context }) {
+                  // Propagate W3C trace context (traceparent + tracestate) to subgraphs
+                  propagation.inject(otelContext.active(), request.http?.headers, {
+                    set: (carrier, key, value) => carrier?.set(key, value),
+                  });
+
                   if (context.userId) {
                     request.http?.headers.set('userId', context.userId);
                   }
@@ -143,6 +150,9 @@ import { MetricsModule } from './metrics/metrics.module';
             new winston.transports.Console({
               debugStdout: true,
               format: isProduction ? productionFormat : developmentFormat,
+            }),
+            new OtelWinstonTransport({
+              level: logLevel,
             }),
           ],
         };

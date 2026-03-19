@@ -1,10 +1,10 @@
-import './tracing/tracing';
+import './observability/otel';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import helmet from 'helmet';
-import { shutdownTracing } from './tracing/tracing';
+import { shutdownOtel } from './observability/otel';
 import { GatewayConfig } from './config/config.types';
 
 async function bootstrap() {
@@ -30,7 +30,7 @@ async function bootstrap() {
 
   const gracefulShutdown = async (signal: string) => {
     logger.log(`Received ${signal}, shutting down gracefully...`);
-    await shutdownTracing();
+    await shutdownOtel();
     await app.close();
   };
 

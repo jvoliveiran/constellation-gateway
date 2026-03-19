@@ -6,25 +6,27 @@ import {
 } from '@nestjs/common';
 import { GqlExecutionContext } from '@nestjs/graphql';
 import { Observable, tap } from 'rxjs';
-import { Counter, Histogram } from 'prom-client';
+import { metrics } from '@opentelemetry/api';
 
-const httpRequestsTotal = new Counter({
-  name: 'gateway_http_requests_total',
-  help: 'Total number of HTTP requests',
-  labelNames: ['method', 'status_code', 'operation_name'] as const,
+const meter = metrics.getMeter('constellation-gateway');
+
+const httpRequestsTotal = meter.createCounter('gateway.http.requests', {
+  description: 'Total number of HTTP requests',
 });
 
-const httpRequestDuration = new Histogram({
-  name: 'gateway_http_request_duration_seconds',
-  help: 'Duration of HTTP requests in seconds',
-  labelNames: ['method', 'operation_name'] as const,
-  buckets: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
-});
+const httpRequestDuration = meter.createHistogram(
+  'gateway.http.request.duration',
+  {
+    description: 'Duration of HTTP requests in seconds',
+    unit: 's',
+    advice: {
+      explicitBucketBoundaries: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
+    },
+  },
+);
 
-const graphqlErrorsTotal = new Counter({
-  name: 'gateway_graphql_errors_total',
-  help: 'Total number of GraphQL errors',
-  labelNames: ['operation_name', 'error_type'] as const,
+const graphqlErrorsTotal = meter.createCounter('gateway.graphql.errors', {
+  description: 'Total number of GraphQL errors',
 });
 
 @Injectable()
@@ -53,29 +55,29 @@ export class MetricsInterceptor implements NestInterceptor {
       tap({
         next: () => {
           const duration = (Date.now() - startTime) / 1000;
-          httpRequestsTotal.inc({
+          httpRequestsTotal.add(1, {
             method,
             status_code: String(res?.statusCode || 200),
             operation_name: operationName,
           });
-          httpRequestDuration.observe(
-            { method, operation_name: operationName },
-            duration,
-          );
+          httpRequestDuration.record(duration, {
+            method,
+            operation_name: operationName,
+          });
         },
         error: (error) => {
           const duration = (Date.now() - startTime) / 1000;
           const statusCode = error?.status || '500';
-          httpRequestsTotal.inc({
+          httpRequestsTotal.add(1, {
             method,
             status_code: String(statusCode),
             operation_name: operationName,
           });
-          httpRequestDuration.observe(
-            { method, operation_name: operationName },
-            duration,
-          );
-          graphqlErrorsTotal.inc({
+          httpRequestDuration.record(duration, {
+            method,
+            operation_name: operationName,
+          });
+          graphqlErrorsTotal.add(1, {
             operation_name: operationName,
             error_type: error?.constructor?.name || 'UnknownError',
           });

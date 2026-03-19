@@ -1,17 +1,33 @@
 import { CallHandler, ExecutionContext } from '@nestjs/common';
 import { of, throwError } from 'rxjs';
-import { register } from 'prom-client';
+
+const mockAdd = jest.fn();
+const mockRecord = jest.fn();
+
+jest.mock('@opentelemetry/api', () => ({
+  metrics: {
+    getMeter: () => ({
+      createCounter: () => ({ add: mockAdd }),
+      createHistogram: () => ({ record: mockRecord }),
+    }),
+  },
+}));
+
+jest.mock('@nestjs/graphql', () => ({
+  GqlExecutionContext: {
+    create: jest.fn(),
+  },
+}));
+
 import { MetricsInterceptor } from './metrics.interceptor';
+import { GqlExecutionContext } from '@nestjs/graphql';
 
 describe('MetricsInterceptor', () => {
   let interceptor: MetricsInterceptor;
 
   beforeEach(() => {
+    jest.clearAllMocks();
     interceptor = new MetricsInterceptor();
-  });
-
-  afterAll(() => {
-    register.clear();
   });
 
   function createMockContext(type: string = 'http'): ExecutionContext {
@@ -40,24 +56,70 @@ describe('MetricsInterceptor', () => {
     return { handle: () => throwError(() => error) };
   }
 
-  it('should record metrics on successful HTTP request', (done) => {
+  it('records request count and duration on successful HTTP request', (done) => {
     const context = createMockContext('http');
     const handler = createMockHandler({ data: 'test' });
 
     interceptor.intercept(context, handler).subscribe({
       next: () => {
+        expect(mockAdd).toHaveBeenCalledWith(1, {
+          method: 'GET',
+          status_code: '200',
+          operation_name: 'unknown',
+        });
+        expect(mockRecord).toHaveBeenCalledWith(
+          expect.any(Number),
+          { method: 'GET', operation_name: 'unknown' },
+        );
         done();
       },
     });
   });
 
-  it('should record metrics on error', (done) => {
+  it('records request count, duration, and error counter on error', (done) => {
     const context = createMockContext('http');
     const error = Object.assign(new Error('Test error'), { status: 500 });
     const handler = createErrorHandler(error);
 
     interceptor.intercept(context, handler).subscribe({
       error: () => {
+        // httpRequestsTotal.add
+        expect(mockAdd).toHaveBeenCalledWith(1, {
+          method: 'GET',
+          status_code: '500',
+          operation_name: 'unknown',
+        });
+        // graphqlErrorsTotal.add
+        expect(mockAdd).toHaveBeenCalledWith(1, {
+          operation_name: 'unknown',
+          error_type: 'Error',
+        });
+        // httpRequestDuration.record
+        expect(mockRecord).toHaveBeenCalledWith(
+          expect.any(Number),
+          { method: 'GET', operation_name: 'unknown' },
+        );
+        done();
+      },
+    });
+  });
+
+  it('extracts GraphQL operation name from gql context', (done) => {
+    (GqlExecutionContext.create as jest.Mock).mockReturnValue({
+      getInfo: () => ({ fieldName: 'getUsers' }),
+      getContext: () => ({ req: { res: { statusCode: 200 } } }),
+    });
+
+    const gqlContext = createMockContext('graphql');
+    const handler = createMockHandler({ data: 'users' });
+
+    interceptor.intercept(gqlContext, handler).subscribe({
+      next: () => {
+        expect(mockAdd).toHaveBeenCalledWith(1, {
+          method: 'POST',
+          status_code: '200',
+          operation_name: 'getUsers',
+        });
         done();
       },
     });
