@@ -494,14 +494,7 @@ src/
 
 **File size** — if a type file exceeds ~80 lines, it is mixing concerns. Split it. A file named `invoice.types.ts` should only contain types directly related to the `Invoice` entity.
 
-**Barrel exports** — use `index.ts` barrel files to expose a module's public type surface without exposing internal structure:
-
-```typescript
-// invoices/types/index.ts
-export type { Invoice, InvoiceStatus } from './invoice.types';
-export type { CreateInvoiceInput, UpdateInvoiceInput } from './invoice-input.types';
-export type { InvoiceResponse, InvoiceSummary } from './invoice-response.types';
-```
+**Barrel exports** — DO NOT use `index.ts` barrel files
 
 ---
 
