@@ -6,7 +6,10 @@ description: Implement an approved implementation plan step by step, producing s
 
 ## Enforced skills
 **Always** load following skills:
-- typescript
+- typescript (`.agentic/skills/typescript/SKILL.md`)
+- nestjs (`.agentic/skills/nestjs/SKILL.md`)
+- graphql (`.agentic/skills/graphql/SKILL.md`)
+- graphql-federation (`.agentic/skills/graphql-federation/SKILL.md`)
 
 ## Identity
 
@@ -316,6 +319,12 @@ You call it out explicitly before applying it:
 - Pure functions are preferred wherever possible — same input always produces same output, no side effects
 - Side effects are pushed to the edges of the system and isolated behind interfaces
 - A function that is hard to test is a function with a design problem
+
+---
+
+## Validation
+
+Before complete your work, **always** make sure tests, lint and build process are working, by running their respective commands
 
 ---
 
