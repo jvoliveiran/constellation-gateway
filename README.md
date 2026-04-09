@@ -4,7 +4,7 @@
 
 ## Constellation Gateway
 
-A production-ready NestJS-based Apollo Federation Gateway that composes a supergraph from GraphQL subgraphs via runtime introspection and exposes a unified GraphQL endpoint for clients.
+A production-ready NestJS-based Apollo Federation Gateway that loads a pre-composed supergraph schema at startup and exposes a unified GraphQL endpoint for clients.
 
 ### Requirements
 - Node.js 20 (`.nvmrc` provided)
@@ -21,8 +21,13 @@ npm install
 ```bash
 cp .env.example .env
 ```
-3. Update `.env` with your values (at minimum `SUBGRAPH` and `JWT_SECRET`).
-4. Run in watch mode:
+3. Update `.env` with your values (at minimum `JWT_SECRET`).
+4. **Generate the supergraph schema** (requires subgraphs running):
+```bash
+make supergraph
+```
+> **CRITICAL:** The gateway loads `supergraph.graphql` at startup. If this file is missing, the gateway will fail to start. You must run `make supergraph` (or `npm run supergraph`) whenever a subgraph schema changes and commit the updated `supergraph.graphql` to the repo.
+5. Run in watch mode:
 ```bash
 npm run dev
 ```
@@ -57,7 +62,8 @@ All environment variables are validated at startup via Zod. The application refu
 |----------|------|---------|----------|-------------|
 | `NODE_ENV` | string | `development` | No | `development`, `production`, or `test` |
 | `SERVICE_PORT` | number | `3000` | No | Port the gateway listens on |
-| `SUBGRAPH` | string | — | **Yes** | Subgraph definitions in `name\|url` format, comma-separated |
+| `SUPERGRAPH_PATH` | string | `./supergraph.graphql` | No | Path to the pre-composed supergraph SDL file |
+| `SUBGRAPH` | string | — | No | Subgraph definitions in `name\|url` format, comma-separated (used only for `/health/ready` pings) |
 | `JWT_SECRET` | string | — | **Yes** | Secret for JWT verification (min 32 characters) |
 | `ALLOWED_ORIGINS` | string | `http://localhost:3002` | No | Comma-separated CORS origins |
 | `RATE_LIMIT_TTL` | number | `60` | No | Rate limit window in seconds |
@@ -84,7 +90,7 @@ SUBGRAPH=constellation|http://localhost:3001/graphql,users|http://localhost:3002
 
 ### GraphQL Gateway
 - **Driver**: `@apollo/gateway` v2 via `@nestjs/graphql` + `@nestjs/apollo` (Apollo Gateway driver).
-- **Composition**: `IntrospectAndCompose` — the gateway introspects subgraphs at startup and composes the supergraph schema at runtime.
+- **Composition**: Static supergraph — the gateway loads a pre-composed `supergraph.graphql` file at startup. No subgraph introspection at boot time, decoupling gateway availability from subgraph availability.
 - **Endpoint**: `/graphql`.
 - **Landing Page**: Apollo Server landing page enabled in development, disabled in production.
 - **Header forwarding**: A custom `RemoteGraphQLDataSource` forwards the following headers to subgraphs:
@@ -126,7 +132,7 @@ The gateway is designed to integrate with **Grafana Cloud** (free tier) but uses
 | Endpoint | Purpose | Details |
 |----------|---------|---------|
 | `GET /health` | Liveness | Gateway process is alive |
-| `GET /health/ready` | Readiness | Subgraphs are reachable |
+| `GET /health/ready` | Readiness | Subgraphs are reachable (only when `SUBGRAPH` env var is set; returns OK otherwise) |
 
 ### Running
 ```bash
@@ -168,6 +174,7 @@ Common commands are available via `make`:
 | `make docker-run` | Run Docker container |
 | `make compose-up` | Start all services |
 | `make compose-down` | Stop all services |
+| `make supergraph` | Compose supergraph SDL from subgraph schemas (requires subgraphs running) |
 
 ### Testing
 ```bash
@@ -189,12 +196,22 @@ npm run test:e2e      # E2E tests
 - **Config validation**: Zod schema validates all env vars at startup
 - **Graceful shutdown**: `enableShutdownHooks()` drains in-flight requests on SIGTERM/SIGINT
 
-### Supergraph composition (Rover)
-Generate a static `supergraph.graphql` file for inspection:
+### Supergraph Composition (Rover)
+
+> **CRITICAL:** The `supergraph.graphql` file is the gateway's schema source of truth. It must be committed to the repo and kept up to date with subgraph schema changes. The gateway will **fail to start** if this file is missing or empty.
+
+Generate or update the supergraph schema (requires subgraphs to be running):
 ```bash
-npm run supergraph
+make supergraph   # or: npm run supergraph
 ```
-Note: The gateway composes at runtime via `IntrospectAndCompose` and does **not** load the generated file. It is `.gitignore`d and intended for offline inspection only.
+
+**Workflow for schema changes:**
+1. A subgraph team changes their schema
+2. Run `make supergraph` to regenerate `supergraph.graphql`
+3. Commit the updated `supergraph.graphql` alongside the subgraph changes — the diff serves as a schema change review gate
+4. The gateway deploys with the checked-in artifact — no subgraph network calls at boot time
+
+The composition is configured via `supergraph-config.yml`, which is the single source of truth for subgraph definitions used by Rover.
 
 ### Integrating Services (Subgraphs)
 
@@ -210,29 +227,37 @@ Your service must:
 
 #### Configuration
 
-Subgraphs are registered via the `SUBGRAPH` environment variable using a comma-separated list of `name|url` pairs:
+Subgraphs are registered in `supergraph-config.yml` for schema composition via Rover:
 
-```
-SUBGRAPH=<name>|<url>[,<name>|<url>,...]
+```yaml
+federation_version: 2
+subgraphs:
+  products:
+    routing_url: http://localhost:3001/graphql
+    schema:
+      subgraph_url: http://localhost:3001/graphql
+  users:
+    routing_url: http://localhost:3002/graphql
+    schema:
+      subgraph_url: http://localhost:3002/graphql
 ```
 
-**Format rules:**
+After updating `supergraph-config.yml`, regenerate the supergraph:
+```bash
+make supergraph
+```
+
+**Optionally**, set the `SUBGRAPH` environment variable to enable `/health/ready` pings to subgraphs at runtime:
+
+```env
+SUBGRAPH=products|http://localhost:3001/graphql,users|http://localhost:3002/graphql
+```
+
+**Format rules for `SUBGRAPH`:**
 - `name` — an alphanumeric identifier (supports hyphens and underscores: `[\w-]+`)
 - `url` — the full HTTP(S) URL to the subgraph's GraphQL endpoint
 - Entries are separated by commas (no spaces around the comma)
 - Validated at startup via Zod — the gateway refuses to start if the format is invalid
-
-#### Single Subgraph
-
-```env
-SUBGRAPH=products|http://localhost:3001/graphql
-```
-
-#### Multiple Subgraphs
-
-```env
-SUBGRAPH=products|http://localhost:3001/graphql,users|http://localhost:3002/graphql,orders|http://localhost:3003/graphql
-```
 
 #### Full `.env` Example
 
@@ -265,7 +290,7 @@ OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic <base64(instanceId:apiKey)>
 
 #### Docker Compose Example
 
-To run the gateway alongside your subgraph services:
+To run the gateway alongside your subgraph services. Note: the gateway no longer needs `depends_on` for subgraphs at boot — it loads the checked-in `supergraph.graphql` instead.
 
 ```yaml
 services:
@@ -278,14 +303,9 @@ services:
     environment:
       NODE_ENV: production
       SERVICE_PORT: 3000
-      SUBGRAPH: products|http://products:3001/graphql,users|http://users:3002/graphql
+      SUBGRAPH: products|http://products:3001/graphql,users|http://users:3002/graphql  # optional — for /health/ready pings
       JWT_SECRET: my-super-secret-key-that-is-at-least-32-chars
       ALLOWED_ORIGINS: https://my-app.example.com
-    depends_on:
-      products:
-        condition: service_healthy
-      users:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--spider", "http://localhost:3000/health"]
       interval: 10s
@@ -328,12 +348,13 @@ Your subgraph can read these headers to enforce authorization, identify the user
 
 #### Verifying Integration
 
-After adding a subgraph to the `SUBGRAPH` variable and starting the gateway:
+After adding a subgraph to `supergraph-config.yml` and regenerating the supergraph:
 
-1. **Check gateway startup logs** — the gateway logs each subgraph it introspects during composition. If a subgraph is unreachable, you will see an error.
-2. **Hit the readiness endpoint** — `GET /health/ready` checks that all configured subgraphs are reachable. A `503` means one or more subgraphs are down.
-3. **Query the composed schema** — in development, open `http://localhost:3000/graphql` to access the Apollo landing page and explore the composed supergraph schema.
-4. **Inspect with Rover** — run `npm run supergraph` to generate a static `supergraph.graphql` file for offline inspection (requires subgraphs to be running).
+1. **Run `make supergraph`** — Rover composes the supergraph from all subgraph schemas. If a subgraph is unreachable or has schema errors, composition will fail with a clear message.
+2. **Commit `supergraph.graphql`** — review the diff to verify the new subgraph's types are composed correctly.
+3. **Start the gateway** — it loads the checked-in `supergraph.graphql` without contacting any subgraph.
+4. **Query the composed schema** — in development, open `http://localhost:3000/graphql` to access the Apollo landing page and explore the composed supergraph schema.
+5. **Hit the readiness endpoint** — if `SUBGRAPH` is set, `GET /health/ready` checks that all configured subgraphs are reachable. A `503` means one or more subgraphs are down.
 
 ### Project structure
 ```
@@ -349,9 +370,11 @@ constellation-gateway/
 │   │   ├── correlation-id.middleware.ts    # X-Correlation-ID middleware
 │   │   └── gql-throttler.guard.ts         # GraphQL-aware throttler guard
 │   ├── config/
-│   │   ├── config.types.ts                # GatewayConfig interface
+│   │   ├── config.types.ts                # GatewayConfig type definitions
 │   │   ├── config.validation.ts           # Zod validation schema
 │   │   └── configuration.ts               # Typed config factory (registerAs)
+│   ├── supergraph/
+│   │   └── supergraph.loader.ts           # Loads pre-composed supergraph SDL from disk
 │   ├── health/
 │   │   ├── health.module.ts               # Terminus + HTTP module
 │   │   └── health.controller.ts           # /health and /health/ready endpoints
@@ -370,7 +393,8 @@ constellation-gateway/
 ├── dockerfile                             # Multi-stage Docker build
 ├── docker-compose.yml                     # Local development environment
 ├── Makefile                               # Common development commands
-├── supergraph-config.yml                  # Rover composition config (offline use)
+├── supergraph.graphql                     # Pre-composed supergraph schema (committed, loaded at startup)
+├── supergraph-config.yml                  # Rover composition config (subgraph registry)
 ├── tsconfig.json                          # TypeScript config (strict mode)
 └── package.json                           # Dependencies, scripts, Jest config
 ```
