@@ -34,6 +34,30 @@ describe('Configuration', () => {
     expect(config.subgraphs[1].name).toBe('users');
   });
 
+  it('should default supergraphPath to ./supergraph.graphql when SUPERGRAPH_PATH is not set', () => {
+    delete process.env.SUPERGRAPH_PATH;
+
+    const config = gatewayConfig();
+
+    expect(config.supergraphPath).toBe('./supergraph.graphql');
+  });
+
+  it('should use custom SUPERGRAPH_PATH when set', () => {
+    process.env.SUPERGRAPH_PATH = '/opt/gateway/supergraph.graphql';
+
+    const config = gatewayConfig();
+
+    expect(config.supergraphPath).toBe('/opt/gateway/supergraph.graphql');
+  });
+
+  it('should return empty subgraphs array when SUBGRAPH is not set', () => {
+    delete process.env.SUBGRAPH;
+
+    const config = gatewayConfig();
+
+    expect(config.subgraphs).toEqual([]);
+  });
+
   it('should use defaults when env vars are not set', () => {
     delete process.env.SERVICE_PORT;
     delete process.env.LOG_LEVEL;

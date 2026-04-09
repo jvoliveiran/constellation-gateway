@@ -1,4 +1,5 @@
-import { IntrospectAndCompose, RemoteGraphQLDataSource } from '@apollo/gateway';
+import { RemoteGraphQLDataSource } from '@apollo/gateway';
+import { loadSupergraphSdl } from './supergraph/supergraph.loader';
 import { ApolloGatewayDriver, ApolloGatewayDriverConfig } from '@nestjs/apollo';
 import { Logger, MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -42,7 +43,7 @@ import { OtelWinstonTransport } from './observability/otel-winston-transport';
           'gateway',
         ) as GatewayConfig;
         const {
-          subgraphs,
+          supergraphPath,
           queryMaxDepth: maxDepth,
           queryMaxComplexity: maxComplexity,
           queryDefaultListSize: defaultListSize,
@@ -50,6 +51,9 @@ import { OtelWinstonTransport } from './observability/otel-winston-transport';
           nodeEnv,
         } = config;
         const isProduction = nodeEnv === 'production';
+
+        const logger = new Logger('SupergraphLoader');
+        logger.log(`Loading supergraph SDL from "${supergraphPath}"`);
 
         const complexityPlugin = createQueryComplexityPlugin(
           { maxComplexity, defaultListSize, warnThreshold },
@@ -132,9 +136,7 @@ import { OtelWinstonTransport } from './observability/otel-winston-transport';
                 },
               });
             },
-            supergraphSdl: new IntrospectAndCompose({
-              subgraphs,
-            }),
+            supergraphSdl: loadSupergraphSdl(supergraphPath),
           },
         };
       },

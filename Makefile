@@ -1,4 +1,4 @@
-.PHONY: dev test lint build docker
+.PHONY: dev test lint build docker supergraph
 
 dev:            ## Start development server
 	npm run dev
@@ -26,3 +26,6 @@ compose-up:     ## Start all services
 
 compose-down:   ## Stop all services
 	docker compose down
+
+supergraph:     ## Compose supergraph SDL from subgraph schemas (requires subgraphs running)
+	npm run supergraph

@@ -5,12 +5,14 @@ export const envSchema = z.object({
     .enum(['development', 'production', 'test'])
     .default('development'),
   SERVICE_PORT: z.coerce.number().default(3000),
+  SUPERGRAPH_PATH: z.string().default('./supergraph.graphql'),
   SUBGRAPH: z
     .string()
     .regex(
       /^[\w-]+\|https?:\/\/[^\s,]+(,[\w-]+\|https?:\/\/[^\s,]+)*$/,
       'SUBGRAPH must follow the format: name|url (comma-separated for multiple)',
-    ),
+    )
+    .optional(),
   JWT_SECRET: z.string().min(32),
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
   ALLOWED_ORIGINS: z.string().default('http://localhost:3002'),

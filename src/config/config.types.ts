@@ -1,6 +1,7 @@
-export interface GatewayConfig {
+export type GatewayConfig = {
   nodeEnv: string;
   port: number;
+  supergraphPath: string;
   subgraphs: SubgraphConfig[];
   jwtSecret: string;
   logLevel: string;
@@ -15,9 +16,9 @@ export interface GatewayConfig {
   otelDisabled: boolean;
   otelEndpoint?: string;
   otelHeaders?: string;
-}
+};
 
-export interface SubgraphConfig {
+export type SubgraphConfig = {
   name: string;
   url: string;
-}
+};

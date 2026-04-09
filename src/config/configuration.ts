@@ -13,7 +13,8 @@ export default registerAs(
   (): GatewayConfig => ({
     nodeEnv: process.env.NODE_ENV || 'development',
     port: parseInt(process.env.SERVICE_PORT || '3000', 10),
-    subgraphs: parseSubgraphs(process.env.SUBGRAPH || ''),
+    supergraphPath: process.env.SUPERGRAPH_PATH || './supergraph.graphql',
+    subgraphs: process.env.SUBGRAPH ? parseSubgraphs(process.env.SUBGRAPH) : [],
     jwtSecret: process.env.JWT_SECRET || '',
     logLevel: process.env.LOG_LEVEL || 'info',
     allowedOrigins: (process.env.ALLOWED_ORIGINS || 'http://localhost:3002')

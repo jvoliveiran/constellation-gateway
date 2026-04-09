@@ -29,6 +29,10 @@ RUN npm ci --omit=dev
 # Copy the build output from the build stage
 COPY --from=build /app/dist ./dist
 
+# Copy the pre-composed supergraph schema (checked into the repo).
+# If this fails, run: make supergraph (requires subgraphs running)
+COPY supergraph.graphql ./supergraph.graphql
+
 # Expose the port the app runs on
 EXPOSE 3000
 

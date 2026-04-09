@@ -6,8 +6,6 @@ services:
     ports:
       - "3000:3000"
     env_file: .env
-    depends_on:
-      - subgraph
     healthcheck:
       test: ["CMD", "wget", "--spider", "http://localhost:3000/health"]
       interval: 10s
@@ -15,8 +13,8 @@ services:
       retries: 3
 
   subgraph:
+    # Optional — for local development only. The gateway no longer depends on this at boot.
     # TODO: Replace with your actual subgraph image (e.g. my-org/constellation-subgraph:latest).
-    # The default node:20-alpine will exit immediately — it exists only to satisfy depends_on.
     image: ${SUBGRAPH_IMAGE:-node:20-alpine}
     command: ["echo", "Replace SUBGRAPH_IMAGE with your subgraph service"]
     ports:

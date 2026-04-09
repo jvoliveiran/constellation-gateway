@@ -15,10 +15,12 @@ describe('Config Validation', () => {
     expect(result.success).toBe(true);
   });
 
-  it('should reject missing SUBGRAPH', () => {
-    const { SUBGRAPH: _, ...configWithoutSubgraph } = validConfig;
+  it('should accept missing SUBGRAPH (optional for runtime)', () => {
+    const configWithoutSubgraph = Object.fromEntries(
+      Object.entries(validConfig).filter(([key]) => key !== 'SUBGRAPH'),
+    );
     const result = envSchema.safeParse(configWithoutSubgraph);
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
   it('should reject malformed SUBGRAPH', () => {
@@ -30,7 +32,9 @@ describe('Config Validation', () => {
   });
 
   it('should reject missing JWT_SECRET', () => {
-    const { JWT_SECRET: _, ...configWithoutSecret } = validConfig;
+    const configWithoutSecret = Object.fromEntries(
+      Object.entries(validConfig).filter(([key]) => key !== 'JWT_SECRET'),
+    );
     const result = envSchema.safeParse(configWithoutSecret);
     expect(result.success).toBe(false);
   });
@@ -50,6 +54,27 @@ describe('Config Validation', () => {
         'constellation|http://localhost:3001/graphql,users|http://localhost:3002/graphql',
     });
     expect(result.success).toBe(true);
+  });
+
+  it('should default SUPERGRAPH_PATH to ./supergraph.graphql', () => {
+    const result = envSchema.safeParse(validConfig);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.SUPERGRAPH_PATH).toBe('./supergraph.graphql');
+    }
+  });
+
+  it('should accept a custom SUPERGRAPH_PATH', () => {
+    const result = envSchema.safeParse({
+      ...validConfig,
+      SUPERGRAPH_PATH: '/opt/gateway/supergraph.graphql',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.SUPERGRAPH_PATH).toBe(
+        '/opt/gateway/supergraph.graphql',
+      );
+    }
   });
 
   it('should apply defaults for optional fields', () => {
