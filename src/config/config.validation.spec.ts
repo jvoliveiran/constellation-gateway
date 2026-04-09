@@ -59,6 +59,9 @@ describe('Config Validation', () => {
       expect(result.data.RATE_LIMIT_TTL).toBe(60);
       expect(result.data.RATE_LIMIT_MAX).toBe(100);
       expect(result.data.QUERY_MAX_DEPTH).toBe(10);
+      expect(result.data.QUERY_MAX_COMPLEXITY).toBe(1000);
+      expect(result.data.QUERY_DEFAULT_LIST_SIZE).toBe(50);
+      expect(result.data.QUERY_COMPLEXITY_WARN_THRESHOLD).toBe(0.8);
       expect(result.data.SUBGRAPH_TIMEOUT_MS).toBe(30000);
       expect(result.data.OTEL_SDK_DISABLED).toBe(true);
     }
@@ -78,5 +81,62 @@ describe('Config Validation', () => {
       LOG_LEVEL: 'verbose',
     });
     expect(result.success).toBe(false);
+  });
+
+  it('should reject QUERY_MAX_COMPLEXITY less than 1', () => {
+    const zeroResult = envSchema.safeParse({
+      ...validConfig,
+      QUERY_MAX_COMPLEXITY: 0,
+    });
+    expect(zeroResult.success).toBe(false);
+
+    const negativeResult = envSchema.safeParse({
+      ...validConfig,
+      QUERY_MAX_COMPLEXITY: -5,
+    });
+    expect(negativeResult.success).toBe(false);
+  });
+
+  it('should reject QUERY_DEFAULT_LIST_SIZE less than 1', () => {
+    const zeroResult = envSchema.safeParse({
+      ...validConfig,
+      QUERY_DEFAULT_LIST_SIZE: 0,
+    });
+    expect(zeroResult.success).toBe(false);
+
+    const negativeResult = envSchema.safeParse({
+      ...validConfig,
+      QUERY_DEFAULT_LIST_SIZE: -10,
+    });
+    expect(negativeResult.success).toBe(false);
+  });
+
+  it('should reject QUERY_COMPLEXITY_WARN_THRESHOLD outside 0-1 range', () => {
+    const aboveOneResult = envSchema.safeParse({
+      ...validConfig,
+      QUERY_COMPLEXITY_WARN_THRESHOLD: 1.5,
+    });
+    expect(aboveOneResult.success).toBe(false);
+
+    const negativeResult = envSchema.safeParse({
+      ...validConfig,
+      QUERY_COMPLEXITY_WARN_THRESHOLD: -0.1,
+    });
+    expect(negativeResult.success).toBe(false);
+  });
+
+  it('should accept valid custom complexity configuration', () => {
+    const result = envSchema.safeParse({
+      ...validConfig,
+      QUERY_MAX_COMPLEXITY: 500,
+      QUERY_DEFAULT_LIST_SIZE: 25,
+      QUERY_COMPLEXITY_WARN_THRESHOLD: 0.9,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.QUERY_MAX_COMPLEXITY).toBe(500);
+      expect(result.data.QUERY_DEFAULT_LIST_SIZE).toBe(25);
+      expect(result.data.QUERY_COMPLEXITY_WARN_THRESHOLD).toBe(0.9);
+    }
   });
 });

@@ -54,7 +54,9 @@ if (!isDisabled) {
   sdk.start();
 }
 
-export function parseOtlpHeaders(raw?: string): Record<string, string> | undefined {
+export function parseOtlpHeaders(
+  raw?: string,
+): Record<string, string> | undefined {
   if (!raw) return undefined;
   const headers: Record<string, string> = {};
   for (const pair of raw.split(',')) {

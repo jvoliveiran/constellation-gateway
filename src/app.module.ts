@@ -1,6 +1,6 @@
 import { IntrospectAndCompose, RemoteGraphQLDataSource } from '@apollo/gateway';
 import { ApolloGatewayDriver, ApolloGatewayDriverConfig } from '@nestjs/apollo';
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { Logger, MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { GraphQLModule } from '@nestjs/graphql';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -8,6 +8,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
 import { ApolloServerPluginLandingPageDisabled } from '@apollo/server/plugin/disabled';
 import depthLimit from 'graphql-depth-limit';
+import { createQueryComplexityPlugin } from './common/query-complexity.plugin';
 import { GraphQLFormattedError } from 'graphql';
 import { context as otelContext, propagation } from '@opentelemetry/api';
 import {
@@ -37,14 +38,27 @@ import { OtelWinstonTransport } from './observability/otel-winston-transport';
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => {
         // Config is guaranteed by Zod validation at startup
-        const config =
-          configService.get<GatewayConfig>('gateway') as GatewayConfig;
-        const { subgraphs, queryMaxDepth: maxDepth, nodeEnv } = config;
+        const config = configService.get<GatewayConfig>(
+          'gateway',
+        ) as GatewayConfig;
+        const {
+          subgraphs,
+          queryMaxDepth: maxDepth,
+          queryMaxComplexity: maxComplexity,
+          queryDefaultListSize: defaultListSize,
+          queryComplexityWarnThreshold: warnThreshold,
+          nodeEnv,
+        } = config;
         const isProduction = nodeEnv === 'production';
 
+        const complexityPlugin = createQueryComplexityPlugin(
+          { maxComplexity, defaultListSize, warnThreshold },
+          new Logger('QueryComplexityPlugin'),
+        );
+
         const plugins = isProduction
-          ? [ApolloServerPluginLandingPageDisabled()]
-          : [ApolloServerPluginLandingPageLocalDefault()];
+          ? [ApolloServerPluginLandingPageDisabled(), complexityPlugin]
+          : [ApolloServerPluginLandingPageLocalDefault(), complexityPlugin];
 
         return {
           server: {
@@ -86,9 +100,13 @@ import { OtelWinstonTransport } from './observability/otel-winston-transport';
                 url,
                 willSendRequest({ request, context }) {
                   // Propagate W3C trace context (traceparent + tracestate) to subgraphs
-                  propagation.inject(otelContext.active(), request.http?.headers, {
-                    set: (carrier, key, value) => carrier?.set(key, value),
-                  });
+                  propagation.inject(
+                    otelContext.active(),
+                    request.http?.headers,
+                    {
+                      set: (carrier, key, value) => carrier?.set(key, value),
+                    },
+                  );
 
                   if (context.userId) {
                     request.http?.headers.set('userId', context.userId);
@@ -125,8 +143,9 @@ import { OtelWinstonTransport } from './observability/otel-winston-transport';
     WinstonModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
-        const { nodeEnv, logLevel } =
-          configService.get<GatewayConfig>('gateway') as GatewayConfig;
+        const { nodeEnv, logLevel } = configService.get<GatewayConfig>(
+          'gateway',
+        ) as GatewayConfig;
         const isProduction = nodeEnv === 'production';
 
         const productionFormat = winston.format.combine(
@@ -162,8 +181,9 @@ import { OtelWinstonTransport } from './observability/otel-winston-transport';
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
-        const { rateLimitTtl, rateLimitMax } =
-          configService.get<GatewayConfig>('gateway') as GatewayConfig;
+        const { rateLimitTtl, rateLimitMax } = configService.get<GatewayConfig>(
+          'gateway',
+        ) as GatewayConfig;
         return [
           {
             ttl: rateLimitTtl * 1000,

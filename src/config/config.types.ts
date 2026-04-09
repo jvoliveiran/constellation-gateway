@@ -8,6 +8,9 @@ export interface GatewayConfig {
   rateLimitTtl: number;
   rateLimitMax: number;
   queryMaxDepth: number;
+  queryMaxComplexity: number;
+  queryDefaultListSize: number;
+  queryComplexityWarnThreshold: number;
   subgraphTimeoutMs: number;
   otelDisabled: boolean;
   otelEndpoint?: string;

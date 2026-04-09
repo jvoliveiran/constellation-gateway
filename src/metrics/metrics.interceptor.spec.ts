@@ -67,10 +67,10 @@ describe('MetricsInterceptor', () => {
           status_code: '200',
           operation_name: 'unknown',
         });
-        expect(mockRecord).toHaveBeenCalledWith(
-          expect.any(Number),
-          { method: 'GET', operation_name: 'unknown' },
-        );
+        expect(mockRecord).toHaveBeenCalledWith(expect.any(Number), {
+          method: 'GET',
+          operation_name: 'unknown',
+        });
         done();
       },
     });
@@ -95,10 +95,10 @@ describe('MetricsInterceptor', () => {
           error_type: 'Error',
         });
         // httpRequestDuration.record
-        expect(mockRecord).toHaveBeenCalledWith(
-          expect.any(Number),
-          { method: 'GET', operation_name: 'unknown' },
-        );
+        expect(mockRecord).toHaveBeenCalledWith(expect.any(Number), {
+          method: 'GET',
+          operation_name: 'unknown',
+        });
         done();
       },
     });

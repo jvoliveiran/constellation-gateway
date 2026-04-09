@@ -18,7 +18,10 @@ const SEVERITY_MAP: Record<string, SeverityNumber> = {
 export class OtelWinstonTransport extends Transport {
   private readonly logger = logs.getLogger('constellation-gateway');
 
-  log(info: { level: string; message: string; [key: string]: unknown }, callback: () => void) {
+  log(
+    info: { level: string; message: string; [key: string]: unknown },
+    callback: () => void,
+  ) {
     const { level, message, ...attributes } = info;
 
     this.logger.emit({
@@ -40,7 +43,11 @@ function sanitizeAttributes(
     // Object.entries skips real Symbols; this catches Winston's stringified
     // internal keys (e.g. "Symbol(level)", "Symbol(splat)")
     if (key.startsWith('Symbol(')) continue;
-    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    if (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    ) {
       result[key] = value;
     } else if (value !== null && value !== undefined) {
       result[key] = String(value);

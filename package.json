@@ -39,6 +39,7 @@
     "axios": "^1.6.8",
     "graphql": "^16.8.1",
     "graphql-depth-limit": "^1.1.0",
+    "graphql-query-complexity": "^1.1.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
     "nest-winston": "^1.9.4",

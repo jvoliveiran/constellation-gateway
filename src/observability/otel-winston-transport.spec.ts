@@ -25,12 +25,9 @@ describe('OtelWinstonTransport', () => {
   });
 
   it('should call callback after logging', (done) => {
-    transport.log(
-      { level: 'info', message: 'test message' },
-      () => {
-        done();
-      },
-    );
+    transport.log({ level: 'info', message: 'test message' }, () => {
+      done();
+    });
   });
 
   it('should emit log record with correct severity', (done) => {

@@ -46,7 +46,22 @@ describe('Configuration', () => {
     expect(config.rateLimitTtl).toBe(60);
     expect(config.rateLimitMax).toBe(100);
     expect(config.queryMaxDepth).toBe(10);
+    expect(config.queryMaxComplexity).toBe(1000);
+    expect(config.queryDefaultListSize).toBe(50);
+    expect(config.queryComplexityWarnThreshold).toBe(0.8);
     expect(config.subgraphTimeoutMs).toBe(30000);
+  });
+
+  it('should parse custom complexity configuration from env vars', () => {
+    process.env.QUERY_MAX_COMPLEXITY = '500';
+    process.env.QUERY_DEFAULT_LIST_SIZE = '25';
+    process.env.QUERY_COMPLEXITY_WARN_THRESHOLD = '0.9';
+
+    const config = gatewayConfig();
+
+    expect(config.queryMaxComplexity).toBe(500);
+    expect(config.queryDefaultListSize).toBe(25);
+    expect(config.queryComplexityWarnThreshold).toBe(0.9);
   });
 
   it('should parse OTEL_SDK_DISABLED correctly', () => {
