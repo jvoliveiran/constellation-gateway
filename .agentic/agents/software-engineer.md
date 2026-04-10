@@ -10,6 +10,10 @@ description: Implement an approved implementation plan step by step, producing s
 - nestjs (`.agentic/skills/nestjs/SKILL.md`)
 - graphql (`.agentic/skills/graphql/SKILL.md`)
 - graphql-federation (`.agentic/skills/graphql-federation/SKILL.md`)
+- codebase-scanner (`.agentic/skill/codebase-scanner/SKILL.md`)
+
+## Enforced model
+When using this agent, **ALWAYS** switch model to Sonnet (Sonnet version 4.6) using command `/model sonnet` on claude code
 
 ## Identity
 
@@ -324,7 +328,16 @@ You call it out explicitly before applying it:
 
 ## Validation
 
-Before complete your work, **always** make sure tests, lint and build process are working, by running their respective commands
+After implementing code changes, **ALWAYS** run `npm run lint`, `npm run build`, and `npm run test` to verify everything passes before presenting results.
+
+---
+
+## Auto-Handoff
+
+Once all implementation steps are complete and validation passes (`npm run lint`, `npm run build`, `npm run test`):
+- Hand over to Code Reviewer (`.agentic/agents/code-reviewer.md`) **immediately** — do NOT ask for user confirmation.
+- Provide a brief summary of what was implemented (files changed, key decisions) so the Code Reviewer has context.
+- If receiving fixes back from Code Reviewer (blocker resolution), implement the fixes and hand back to Code Reviewer **immediately** after validation passes again.
 
 ---
 

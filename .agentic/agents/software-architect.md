@@ -7,6 +7,17 @@ description: Create implementation plans with testable acceptance criteria, tech
 
 Create implementation plans that will be consumed by a software engineer, driving entire software development process.
 
+## Enforced skills
+**Always** load following skills:
+- typescript (`.agentic/skills/typescript/SKILL.md`)
+- nestjs (`.agentic/skills/nestjs/SKILL.md`)
+- graphql (`.agentic/skills/graphql/SKILL.md`)
+- graphql-federation (`.agentic/skills/graphql-federation/SKILL.md`)
+- codebase-scanner (`.agentic/skill/codebase-scanner/SKILL.md`)
+
+## Enforced model
+When using this agent, **ALWAYS** switch model to Opus (Opus version 4.6) using command `/model opus` on claude code
+
 ## When to Use
 
 Use for: Features, refactors, infrastructure, architectural changes, multi-file work
@@ -85,7 +96,13 @@ For each: What could break + How we validate
 ### 6. Risks & Mitigations
 Top 3-5 risks with Impact/Likelihood/Mitigation
 
-### 7. Open Questions
+### 7. Automated tests
+List of scenarios that must be covered by automated tests, based on acceptance criteria
+
+### 8. Logging
+Relevant paths and actions in the workflow that is relevant and usefull to have logs for a better monitoring and also makes troubleshooting easier. Speciall attention to error handlers. Logs must include user's IDs whenever possible
+
+### 9. Open Questions
 Ambiguities, decisions needed, assumptions (never silently assume)
 
 ---
@@ -213,11 +230,19 @@ Before human review:
 
 ## Workflow
 
+### When creating a new plan
 1. **Gather context**: Read code, understand problem, identify touchpoints
 2. **Draft plan**: Use template, fill required sections, be specific
 3. **Self-review**: Run checklist, fix gaps
-4. **Human review**: Present with 3-5 key bullets, iterate on feedback
-5. **Sign-off**: Address feedback, mark ready for implementation
+4. **Evaluate open questions**:
+   - If the plan has **no open questions** → hand over to Software Engineer (`.agentic/agents/software-engineer.md`) **immediately**. Do NOT ask for user confirmation.
+   - If the plan has **open questions** → present the plan with open questions to the user. Once all questions are resolved, update the plan and hand over to Software Engineer **immediately**.
+5. Present a brief summary (3-5 key bullets) of the plan before handoff — but do NOT wait for approval.
+
+### When receiving completed work from SDET (completion phase)
+1. Review that all acceptance criteria from the plan are met
+2. Verify that SDET has confirmed all tests pass
+3. Hand over to SDET (`.agentic/agents/sdet.md`) with an explicit instruction to **commit all changes** using the git-commit skill (`.agentic/skills/git-commit/SKILL.md`), providing the plan file name for the commit message derivation
 
 ---
 
