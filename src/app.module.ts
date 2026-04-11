@@ -14,6 +14,7 @@ import { createQueryComplexityPlugin } from './common/query-complexity.plugin';
 import { createRateLimitPlugin } from './common/rate-limit.plugin';
 import { createResponseCachePlugin } from './common/response-cache.plugin';
 import { createResponseCacheMetricsPlugin } from './common/response-cache-metrics.plugin';
+import { createRequestLoggingPlugin } from './common/request-logging.plugin';
 import { GraphQLFormattedError } from 'graphql';
 import { context as otelContext, propagation } from '@opentelemetry/api';
 import {
@@ -76,10 +77,15 @@ import { OtelWinstonTransport } from './observability/otel-winston-transport';
           new Logger('RateLimitPlugin'),
         );
 
+        const requestLoggingPlugin = createRequestLoggingPlugin(
+          new Logger('RequestLoggingPlugin'),
+        );
+
         const plugins = [
           isProduction
             ? ApolloServerPluginLandingPageDisabled()
             : ApolloServerPluginLandingPageLocalDefault(),
+          requestLoggingPlugin,
           complexityPlugin,
           rateLimitPlugin,
         ];

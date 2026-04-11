@@ -45,6 +45,7 @@ npm run dev
 | Language | TypeScript (strict mode) | 5.x |
 | Runtime | Node.js | 20 |
 | Auth | jsonwebtoken (JWT) | 9.x |
+| Token Revocation | ioredis (Redis blacklist) | 5.x |
 | Logging | Winston via nest-winston | 3.x / 1.9.x |
 | Metrics | prom-client (Prometheus) | 15.x |
 | Tracing | OpenTelemetry (OTLP) | 0.213.x |
@@ -64,7 +65,10 @@ All environment variables are validated at startup via Zod. The application refu
 | `SERVICE_PORT` | number | `3000` | No | Port the gateway listens on |
 | `SUPERGRAPH_PATH` | string | `./supergraph.graphql` | No | Path to the pre-composed supergraph SDL file |
 | `SUBGRAPH` | string | — | No | Subgraph definitions in `name\|url` format, comma-separated (used only for `/health/ready` pings) |
-| `JWT_SECRET` | string | — | **Yes** | Secret for JWT verification (min 32 characters) |
+| `JWT_SECRET` | string | — | **Yes** | Secret for JWT verification (min 32 characters). Must match the signing secret used by the user-service |
+| `PUBLIC_OPERATIONS` | string | `""` | No | Comma-separated GraphQL operation field names that bypass JWT auth (e.g. `login,signup,refreshToken`) |
+| `TOKEN_REVOCATION_ENABLED` | boolean | `false` | No | Enable Redis-based token revocation checking |
+| `REDIS_URL` | string | `redis://localhost:6379` | No | Redis connection URL for token blacklist (required when `TOKEN_REVOCATION_ENABLED=true`) |
 | `ALLOWED_ORIGINS` | string | `http://localhost:3002` | No | Comma-separated CORS origins |
 | `RATE_LIMIT_TTL` | number | `60` | No | Rate limit window in seconds |
 | `RATE_LIMIT_MAX` | number | `100` | No | Max requests per rate limit window |
@@ -81,7 +85,9 @@ SUBGRAPH=constellation|http://localhost:3001/graphql,users|http://localhost:3002
 ```
 
 ### Security
-- **JWT Authentication**: All GraphQL requests require a valid `Authorization: Bearer <token>` header. The guard verifies the token using `JWT_SECRET` and attaches `userId` and `permissions` to the request context. Health and metrics endpoints are public.
+- **JWT Authentication**: All GraphQL requests require a valid `Authorization: Bearer <token>` header. The middleware verifies the token using `JWT_SECRET` and maps the user-service JWT payload (`sub`, `roles`) to gateway internal fields (`userId`, `permissions`). Health, metrics, and configured public operations are exempt.
+- **Public Operations**: GraphQL operations listed in `PUBLIC_OPERATIONS` (e.g. `login`, `signup`, `refreshToken`) bypass JWT auth. The middleware parses the incoming GraphQL request body and checks all top-level fields against the allowlist. Batched requests mixing public and private operations require auth (secure default).
+- **Token Revocation**: When `TOKEN_REVOCATION_ENABLED=true`, the middleware checks Redis for revoked token JTIs after JWT signature verification. If the token's `jti` is found in the `revoked:jwt:{jti}` key, the request is rejected with 401. Fail-open: if Redis is unavailable, the gateway falls back to stateless JWT verification. Requires the issuing service to include `jti` in tokens and write revocations to Redis.
 - **Query Depth Limiting**: Rejects queries exceeding `QUERY_MAX_DEPTH` (default: 10) to prevent abuse.
 - **Rate Limiting**: Global throttle via `@nestjs/throttler` — configurable window and max requests.
 - **Helmet**: Sets security headers (X-Frame-Options, X-Content-Type-Options, Strict-Transport-Security, etc.). CSP is disabled to allow the Apollo landing page in development.
@@ -94,9 +100,9 @@ SUBGRAPH=constellation|http://localhost:3001/graphql,users|http://localhost:3002
 - **Endpoint**: `/graphql`.
 - **Landing Page**: Apollo Server landing page enabled in development, disabled in production.
 - **Header forwarding**: A custom `RemoteGraphQLDataSource` forwards the following headers to subgraphs:
-  - `userId` — from verified JWT payload
+  - `userId` — mapped from the JWT `sub` claim
   - `authorization` — original bearer token
-  - `permissions` — JSON-encoded array from JWT payload
+  - `permissions` — JSON-encoded array mapped from the JWT `roles` claim
   - `x-correlation-id` — request correlation ID for distributed tracing
 
 ### Observability
@@ -274,10 +280,15 @@ SUBGRAPH_TIMEOUT_MS=5000
 
 # Security
 JWT_SECRET=my-super-secret-key-that-is-at-least-32-chars
+PUBLIC_OPERATIONS=login,signup,refreshToken,verifyEmail,requestPasswordReset,resetPassword,resendVerificationEmail
 ALLOWED_ORIGINS=https://my-app.example.com,https://admin.example.com
 RATE_LIMIT_TTL=60
 RATE_LIMIT_MAX=200
 QUERY_MAX_DEPTH=8
+
+# Token Revocation (optional — disabled by default)
+TOKEN_REVOCATION_ENABLED=false
+REDIS_URL=redis://localhost:6379
 
 # Logging
 LOG_LEVEL=info
@@ -339,9 +350,9 @@ The gateway automatically forwards the following headers to every subgraph on ea
 
 | Header | Source | Description |
 |--------|--------|-------------|
-| `userId` | JWT payload | The authenticated user's ID |
+| `userId` | JWT `sub` claim | The authenticated user's ID (mapped from the standard `sub` JWT claim) |
 | `authorization` | Incoming request | The original `Bearer <token>` header |
-| `permissions` | JWT payload | JSON-encoded array of user permissions |
+| `permissions` | JWT `roles` claim | JSON-encoded array of user roles/permissions (mapped from the `roles` JWT claim) |
 | `x-correlation-id` | Middleware | Unique request correlation ID for distributed tracing |
 
 Your subgraph can read these headers to enforce authorization, identify the user, or propagate tracing context.
@@ -363,9 +374,13 @@ constellation-gateway/
 │   ├── main.ts                            # Bootstrap, helmet, CORS, shutdown hooks
 │   ├── app.module.ts                      # Root module: config, GraphQL, auth, throttler, logging
 │   ├── auth/
-│   │   ├── auth.module.ts                 # Auth module (global JWT guard)
-│   │   ├── jwt-auth.guard.ts              # JWT verification guard
-│   │   └── public.decorator.ts            # @Public() decorator to skip auth
+│   │   ├── auth.module.ts                 # Auth module (JWT guard + optional token blacklist)
+│   │   ├── auth.types.ts                  # Shared types: UserServiceJwtPayload, GatewayUser
+│   │   ├── jwt-auth.guard.ts              # JWT verification guard (defense-in-depth for controller routes)
+│   │   ├── jwt-auth.middleware.ts         # JWT auth middleware (runs before Apollo Gateway)
+│   │   ├── public-operations.ts           # GraphQL body parser for public operation allowlist
+│   │   ├── public.decorator.ts            # @Public() decorator to skip auth
+│   │   └── token-blacklist.service.ts     # Redis-backed token revocation check (opt-in)
 │   ├── common/
 │   │   ├── correlation-id.middleware.ts    # X-Correlation-ID middleware
 │   │   └── gql-throttler.guard.ts         # GraphQL-aware throttler guard

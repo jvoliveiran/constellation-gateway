@@ -124,3 +124,60 @@ This document captures key architectural decisions made during the development o
 **Decision**: Add `esModuleInterop: true` to the main `tsconfig.json`.
 
 **Rationale**: `esModuleInterop` is the NestJS recommended setting and is the modern TypeScript default. The only source change required was in `otel-winston-transport.ts` (`import * as Transport` → `import Transport`). All 85 unit tests and 20+ E2E tests pass after the change. Build output is functionally identical.
+
+---
+
+## ADR-008: JWT Payload Mapping — Gateway Adapts to User-Service Token Format
+
+**Date**: 2026-04-10
+**Status**: Accepted
+
+**Context**: The user-service signs JWTs with the standard payload `{ sub, email, roles }`, but the gateway internally uses `{ userId, permissions }` for forwarding headers to subgraphs. The question was whether to change the user-service payload format or adapt at the gateway.
+
+**Options considered**:
+1. **Adapt at the gateway** — Map `sub`→`userId` and `roles`→`permissions` in the middleware/guard. User-service remains unchanged.
+2. **Change user-service** — Sign tokens with `{ userId, permissions }` to match the gateway. Requires coordinating changes across services and potentially breaking existing consumers.
+3. **Use a shared type package** — Publish a common JWT payload type. Adds build-time coupling between services.
+
+**Decision**: Adapt at the gateway.
+
+**Rationale**: The user-service follows JWT standards (`sub` is the standard subject claim). The gateway is the consumer and should adapt to the producer's format. This avoids coupling between services and keeps the user-service aligned with JWT conventions. The mapping is explicit and documented in `auth.types.ts`. If additional subgraphs issue JWTs with different payload shapes, the gateway can add format-specific mappers without affecting existing services.
+
+---
+
+## ADR-009: Public Operation Routing — Config-Based Allowlist vs Supergraph Directive Detection
+
+**Date**: 2026-04-10
+**Status**: Accepted
+
+**Context**: The `JwtAuthMiddleware` blocks all `/graphql` requests without a token. Public mutations (login, signup, etc.) need to pass through. The question was how to determine which operations are public.
+
+**Options considered**:
+1. **`PUBLIC_OPERATIONS` env var** — Comma-separated list of GraphQL field names. Simple, explicit, no schema parsing at startup.
+2. **`@tag(name: "public")` in supergraph SDL** — Parse the composed supergraph at startup, extract tagged operations. Auto-discovers public operations from schema metadata.
+3. **Hardcoded list in gateway code** — No configuration, lowest flexibility.
+4. **User-service `@public`/`@private` directives via `@composeDirective`** — Propagate subgraph custom directives into the supergraph. Requires federation tooling changes.
+
+**Decision**: `PUBLIC_OPERATIONS` env var with future path to `@tag` detection.
+
+**Rationale**: The env var approach requires no changes to the user-service or federation tooling. It is explicit — operators see exactly which operations are public in the deployment config. The middleware parses the GraphQL request body using the `graphql` parser (already a dependency), extracts top-level field names, and checks against the allowlist. Security: batched requests mixing public and private operations require auth (all fields must be in the allowlist). Future enhancement: when the user-service adds `@tag(name: "public")` to its schema, the gateway can auto-detect these and merge with the env-based list.
+
+---
+
+## ADR-010: Token Revocation — Redis Blacklist with Fail-Open
+
+**Date**: 2026-04-10
+**Status**: Accepted
+
+**Context**: The gateway performs stateless JWT verification. Revoked tokens (after logout, password change) remain valid until expiry. The question was how to implement token revocation at the gateway level.
+
+**Options considered**:
+1. **Redis token blacklist** — Gateway checks Redis `EXISTS revoked:jwt:{jti}` after JWT verification. Immediate invalidation, ~1ms overhead per request.
+2. **Token introspection endpoint** — Gateway calls user-service to validate each token. Immediate but adds 5-50ms latency per request and creates availability coupling.
+3. **Redis pub/sub + in-memory set** — User-service publishes revocation events, gateway subscribes. Near-real-time with zero per-request overhead. Higher complexity.
+4. **Polling-based blacklist** — Gateway polls periodically for newly revoked tokens. Configurable delay, no per-request overhead.
+5. **Short TTL + refresh tokens** — Very short access tokens (2-5 min). Bounded revocation window but no immediate invalidation.
+
+**Decision**: Redis token blacklist with fail-open semantics.
+
+**Rationale**: Best balance of simplicity, reliability, and latency. Redis is already planned for rate limiting (ADR-006). The ~1ms per-request overhead is negligible versus subgraph round-trips. Fail-open design: if Redis is unavailable, the gateway falls back to stateless JWT verification (current behavior). This prioritizes availability over security — a Redis outage does not lock out all users. The risk window is bounded by token TTL (1 hour). The feature is opt-in (`TOKEN_REVOCATION_ENABLED=false` by default) and gracefully degrades when `jti` is absent from the JWT (user-service must add `jti` for revocation to function).

@@ -71,10 +71,7 @@ const NESTED_STUB = {};
 
 export const resolvers = {
   Mutation: {
-    login: (
-      _: unknown,
-      { email }: { email: string },
-    ) => ({
+    login: (_: unknown, { email }: { email: string }) => ({
       accessToken: `mock-token-for-${email}`,
     }),
   },
