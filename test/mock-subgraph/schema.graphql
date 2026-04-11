@@ -1,0 +1,60 @@
+extend schema
+  @link(
+    url: "https://specs.apollo.dev/federation/v2.0"
+    import: ["@key"]
+  )
+
+type Query {
+  user(id: ID!): User
+  users: [User!]!
+  error: String
+  nested: Level1
+}
+
+type Mutation {
+  login(email: String!, password: String!): LoginResult!
+}
+
+type LoginResult {
+  accessToken: String!
+}
+
+type User @key(fields: "id") {
+  id: ID!
+  name: String!
+  email: String!
+}
+
+type Level1 {
+  level2: Level2
+}
+type Level2 {
+  level3: Level3
+}
+type Level3 {
+  level4: Level4
+}
+type Level4 {
+  level5: Level5
+}
+type Level5 {
+  level6: Level6
+}
+type Level6 {
+  level7: Level7
+}
+type Level7 {
+  level8: Level8
+}
+type Level8 {
+  level9: Level9
+}
+type Level9 {
+  level10: Level10
+}
+type Level10 {
+  level11: Level11
+}
+type Level11 {
+  value: String
+}

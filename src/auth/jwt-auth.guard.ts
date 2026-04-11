@@ -10,11 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { verify } from 'jsonwebtoken';
 import { IS_PUBLIC_KEY } from './public.decorator';
 import { GatewayConfig } from '../config/config.types';
-
-interface JwtPayload {
-  userId: string;
-  permissions: string[];
-}
+import { UserServiceJwtPayload, GatewayUser } from './auth.types';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -49,11 +45,11 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     try {
-      const decoded = verify(token, secret) as JwtPayload;
+      const decoded = verify(token, secret) as UserServiceJwtPayload;
       request.user = {
-        userId: decoded.userId,
-        permissions: decoded.permissions,
-      };
+        userId: decoded.sub,
+        permissions: decoded.roles,
+      } satisfies GatewayUser;
       return true;
     } catch {
       throw new UnauthorizedException('Invalid or expired token');

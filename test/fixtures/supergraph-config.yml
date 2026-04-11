@@ -1,0 +1,6 @@
+federation_version: 2
+subgraphs:
+  constellation:
+    routing_url: http://localhost:4111/graphql
+    schema:
+      file: ../mock-subgraph/schema.graphql

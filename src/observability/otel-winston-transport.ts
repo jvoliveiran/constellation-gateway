@@ -1,4 +1,4 @@
-import * as Transport from 'winston-transport';
+import Transport from 'winston-transport';
 import { logs, SeverityNumber } from '@opentelemetry/api-logs';
 
 const SEVERITY_MAP: Record<string, SeverityNumber> = {

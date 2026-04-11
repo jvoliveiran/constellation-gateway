@@ -4,6 +4,7 @@ export type GatewayConfig = {
   supergraphPath: string;
   subgraphs: SubgraphConfig[];
   jwtSecret: string;
+  publicOperations: string[];
   logLevel: string;
   allowedOrigins: string[];
   rateLimitTtl: number;
@@ -13,6 +14,12 @@ export type GatewayConfig = {
   queryDefaultListSize: number;
   queryComplexityWarnThreshold: number;
   subgraphTimeoutMs: number;
+  apqEnabled: boolean;
+  responseCacheEnabled: boolean;
+  responseCacheTtl: number;
+  responseCacheMaxSize: number;
+  tokenRevocationEnabled: boolean;
+  redisUrl: string;
   otelDisabled: boolean;
   otelEndpoint?: string;
   otelHeaders?: string;

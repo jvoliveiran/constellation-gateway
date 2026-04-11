@@ -16,6 +16,11 @@ export default registerAs(
     supergraphPath: process.env.SUPERGRAPH_PATH || './supergraph.graphql',
     subgraphs: process.env.SUBGRAPH ? parseSubgraphs(process.env.SUBGRAPH) : [],
     jwtSecret: process.env.JWT_SECRET || '',
+    publicOperations: process.env.PUBLIC_OPERATIONS
+      ? process.env.PUBLIC_OPERATIONS.split(',')
+          .map((op) => op.trim())
+          .filter(Boolean)
+      : [],
     logLevel: process.env.LOG_LEVEL || 'info',
     allowedOrigins: (process.env.ALLOWED_ORIGINS || 'http://localhost:3002')
       .split(',')
@@ -35,6 +40,15 @@ export default registerAs(
       process.env.QUERY_COMPLEXITY_WARN_THRESHOLD || '0.8',
     ),
     subgraphTimeoutMs: parseInt(process.env.SUBGRAPH_TIMEOUT_MS || '30000', 10),
+    apqEnabled: process.env.APQ_ENABLED !== 'false',
+    responseCacheEnabled: process.env.RESPONSE_CACHE_ENABLED === 'true',
+    responseCacheTtl: parseInt(process.env.RESPONSE_CACHE_TTL || '60', 10),
+    responseCacheMaxSize: parseInt(
+      process.env.RESPONSE_CACHE_MAX_SIZE || '500',
+      10,
+    ),
+    tokenRevocationEnabled: process.env.TOKEN_REVOCATION_ENABLED === 'true',
+    redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
     otelDisabled: process.env.OTEL_SDK_DISABLED !== 'false',
     otelEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
     otelHeaders: process.env.OTEL_EXPORTER_OTLP_HEADERS,

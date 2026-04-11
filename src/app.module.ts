@@ -8,8 +8,12 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
 import { ApolloServerPluginLandingPageDisabled } from '@apollo/server/plugin/disabled';
+import { ApolloServerPluginCacheControl } from '@apollo/server/plugin/cacheControl';
 import depthLimit from 'graphql-depth-limit';
 import { createQueryComplexityPlugin } from './common/query-complexity.plugin';
+import { createRateLimitPlugin } from './common/rate-limit.plugin';
+import { createResponseCachePlugin } from './common/response-cache.plugin';
+import { createResponseCacheMetricsPlugin } from './common/response-cache-metrics.plugin';
 import { GraphQLFormattedError } from 'graphql';
 import { context as otelContext, propagation } from '@opentelemetry/api';
 import {
@@ -24,6 +28,7 @@ import { validate } from './config/config.validation';
 import gatewayConfig from './config/configuration';
 import { GatewayConfig } from './config/config.types';
 import { CorrelationIdMiddleware } from './common/correlation-id.middleware';
+import { JwtAuthMiddleware } from './auth/jwt-auth.middleware';
 import { MetricsModule } from './metrics/metrics.module';
 import { OtelWinstonTransport } from './observability/otel-winston-transport';
 
@@ -48,6 +53,12 @@ import { OtelWinstonTransport } from './observability/otel-winston-transport';
           queryMaxComplexity: maxComplexity,
           queryDefaultListSize: defaultListSize,
           queryComplexityWarnThreshold: warnThreshold,
+          rateLimitTtl,
+          rateLimitMax,
+          apqEnabled,
+          responseCacheEnabled,
+          responseCacheTtl,
+          responseCacheMaxSize,
           nodeEnv,
         } = config;
         const isProduction = nodeEnv === 'production';
@@ -60,24 +71,55 @@ import { OtelWinstonTransport } from './observability/otel-winston-transport';
           new Logger('QueryComplexityPlugin'),
         );
 
-        const plugins = isProduction
-          ? [ApolloServerPluginLandingPageDisabled(), complexityPlugin]
-          : [ApolloServerPluginLandingPageLocalDefault(), complexityPlugin];
+        const rateLimitPlugin = createRateLimitPlugin(
+          { ttl: rateLimitTtl, max: rateLimitMax },
+          new Logger('RateLimitPlugin'),
+        );
+
+        const plugins = [
+          isProduction
+            ? ApolloServerPluginLandingPageDisabled()
+            : ApolloServerPluginLandingPageLocalDefault(),
+          complexityPlugin,
+          rateLimitPlugin,
+        ];
+
+        if (responseCacheEnabled) {
+          plugins.push(
+            ApolloServerPluginCacheControl({
+              defaultMaxAge: responseCacheTtl,
+            }),
+          );
+          plugins.push(
+            createResponseCachePlugin({
+              ttl: responseCacheTtl,
+              maxSize: responseCacheMaxSize,
+            }),
+          );
+          plugins.push(createResponseCacheMetricsPlugin());
+          logger.log(
+            `Response cache enabled: TTL=${responseCacheTtl}s, maxSize=${responseCacheMaxSize}`,
+          );
+        }
 
         return {
           server: {
+            ...(apqEnabled ? {} : { persistedQueries: false }),
             context: ({
               req,
             }: {
               req: {
                 user?: { userId: string; permissions: string[] };
                 headers: Record<string, string>;
+                ip?: string;
+                socket?: { remoteAddress?: string };
               };
             }) => ({
               userId: req.user?.userId,
               permissions: req.user?.permissions,
               authorization: req.headers?.authorization,
               correlationId: req.headers?.['x-correlation-id'],
+              clientIp: req.ip || req.socket?.remoteAddress,
             }),
             playground: false,
             plugins,
@@ -209,6 +251,6 @@ import { OtelWinstonTransport } from './observability/otel-winston-transport';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(CorrelationIdMiddleware).forRoutes('*');
+    consumer.apply(CorrelationIdMiddleware, JwtAuthMiddleware).forRoutes('*');
   }
 }

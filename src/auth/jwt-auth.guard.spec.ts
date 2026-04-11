@@ -39,7 +39,7 @@ describe('JwtAuthGuard', () => {
 
   it('should allow access with a valid token', () => {
     const token = sign(
-      { userId: 'user-123', permissions: ['read'] },
+      { sub: 'user-123', email: 'u@t.com', roles: ['read'] },
       TEST_SECRET,
     );
     const context = createMockExecutionContext({
@@ -56,9 +56,13 @@ describe('JwtAuthGuard', () => {
   });
 
   it('should throw UnauthorizedException for expired token', () => {
-    const token = sign({ userId: 'user-123', permissions: [] }, TEST_SECRET, {
-      expiresIn: -1,
-    });
+    const token = sign(
+      { sub: 'user-123', email: 'u@t.com', roles: [] },
+      TEST_SECRET,
+      {
+        expiresIn: -1,
+      },
+    );
     const context = createMockExecutionContext({
       authorization: `Bearer ${token}`,
     });
@@ -89,9 +93,11 @@ describe('JwtAuthGuard', () => {
     expect(guard.canActivate(context)).toBe(true);
   });
 
-  it('should attach user data to request on valid token', () => {
-    const payload = { userId: 'user-456', permissions: ['admin'] };
-    const token = sign(payload, TEST_SECRET);
+  it('should map sub→userId and roles→permissions on request', () => {
+    const token = sign(
+      { sub: 'user-456', email: 'u@t.com', roles: ['admin'] },
+      TEST_SECRET,
+    );
     const context = createMockExecutionContext({
       authorization: `Bearer ${token}`,
     });
