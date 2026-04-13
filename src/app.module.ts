@@ -1,4 +1,4 @@
-import { RemoteGraphQLDataSource } from '@apollo/gateway';
+import { ResilientGraphQLDataSource } from './gateway/resilient-datasource';
 import { loadSupergraphSdl } from './supergraph/supergraph.loader';
 import { ApolloGatewayDriver, ApolloGatewayDriverConfig } from '@nestjs/apollo';
 import { Logger, MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
@@ -56,6 +56,11 @@ import { OtelWinstonTransport } from './observability/otel-winston-transport';
           queryComplexityWarnThreshold: warnThreshold,
           rateLimitTtl,
           rateLimitMax,
+          subgraphTimeoutMs,
+          subgraphRetryCount,
+          subgraphRetryDelayMs,
+          circuitBreakerThreshold,
+          circuitBreakerResetMs,
           apqEnabled,
           responseCacheEnabled,
           responseCacheTtl,
@@ -148,41 +153,52 @@ import { OtelWinstonTransport } from './observability/otel-winston-transport';
           },
           gateway: {
             buildService: ({ url }) => {
-              return new RemoteGraphQLDataSource({
-                url,
-                willSendRequest({ request, context }) {
-                  // Propagate W3C trace context (traceparent + tracestate) to subgraphs
-                  propagation.inject(
-                    otelContext.active(),
-                    request.http?.headers,
-                    {
-                      set: (carrier, key, value) => carrier?.set(key, value),
-                    },
-                  );
-
-                  if (context.userId) {
-                    request.http?.headers.set('userId', context.userId);
-                  }
-                  if (context.authorization) {
-                    request.http?.headers.set(
-                      'authorization',
-                      context.authorization,
-                    );
-                  }
-                  if (context.permissions) {
-                    request.http?.headers.set(
-                      'permissions',
-                      JSON.stringify(context.permissions),
-                    );
-                  }
-                  if (context.correlationId) {
-                    request.http?.headers.set(
-                      'x-correlation-id',
-                      context.correlationId,
-                    );
-                  }
+              const dataSource = new ResilientGraphQLDataSource({
+                url: url ?? '',
+                resilience: {
+                  timeoutMs: subgraphTimeoutMs,
+                  retryCount: subgraphRetryCount,
+                  retryDelayMs: subgraphRetryDelayMs,
+                  circuitBreakerThreshold,
+                  circuitBreakerResetMs,
                 },
+                logger: new Logger('ResilientGraphQLDataSource'),
               });
+
+              dataSource.willSendRequest = ({ request, context }) => {
+                // Propagate W3C trace context (traceparent + tracestate) to subgraphs
+                propagation.inject(
+                  otelContext.active(),
+                  request.http?.headers,
+                  {
+                    set: (carrier, key, value) => carrier?.set(key, value),
+                  },
+                );
+
+                if (context.userId) {
+                  request.http?.headers.set('userId', context.userId);
+                }
+                if (context.authorization) {
+                  request.http?.headers.set(
+                    'authorization',
+                    context.authorization,
+                  );
+                }
+                if (context.permissions) {
+                  request.http?.headers.set(
+                    'permissions',
+                    JSON.stringify(context.permissions),
+                  );
+                }
+                if (context.correlationId) {
+                  request.http?.headers.set(
+                    'x-correlation-id',
+                    context.correlationId,
+                  );
+                }
+              };
+
+              return dataSource;
             },
             supergraphSdl: loadSupergraphSdl(supergraphPath),
           },

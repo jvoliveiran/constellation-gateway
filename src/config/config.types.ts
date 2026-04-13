@@ -14,6 +14,10 @@ export type GatewayConfig = {
   queryDefaultListSize: number;
   queryComplexityWarnThreshold: number;
   subgraphTimeoutMs: number;
+  subgraphRetryCount: number;
+  subgraphRetryDelayMs: number;
+  circuitBreakerThreshold: number;
+  circuitBreakerResetMs: number;
   apqEnabled: boolean;
   responseCacheEnabled: boolean;
   responseCacheTtl: number;

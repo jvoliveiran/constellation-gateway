@@ -40,6 +40,19 @@ export default registerAs(
       process.env.QUERY_COMPLEXITY_WARN_THRESHOLD || '0.8',
     ),
     subgraphTimeoutMs: parseInt(process.env.SUBGRAPH_TIMEOUT_MS || '30000', 10),
+    subgraphRetryCount: parseInt(process.env.SUBGRAPH_RETRY_COUNT || '2', 10),
+    subgraphRetryDelayMs: parseInt(
+      process.env.SUBGRAPH_RETRY_DELAY_MS || '200',
+      10,
+    ),
+    circuitBreakerThreshold: parseInt(
+      process.env.CIRCUIT_BREAKER_THRESHOLD || '5',
+      10,
+    ),
+    circuitBreakerResetMs: parseInt(
+      process.env.CIRCUIT_BREAKER_RESET_MS || '30000',
+      10,
+    ),
     apqEnabled: process.env.APQ_ENABLED !== 'false',
     responseCacheEnabled: process.env.RESPONSE_CACHE_ENABLED === 'true',
     responseCacheTtl: parseInt(process.env.RESPONSE_CACHE_TTL || '60', 10),
