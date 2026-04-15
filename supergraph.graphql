@@ -1,0 +1,1338 @@
+schema
+  @link(url: "https://specs.apollo.dev/link/v1.0")
+  @link(url: "https://specs.apollo.dev/join/v0.3", for: EXECUTION)
+{
+  query: Query
+  mutation: Mutation
+}
+
+directive @join__enumValue(graph: join__Graph!) repeatable on ENUM_VALUE
+
+directive @join__field(graph: join__Graph, requires: join__FieldSet, provides: join__FieldSet, type: String, external: Boolean, override: String, usedOverridden: Boolean) repeatable on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
+
+directive @join__graph(name: String!, url: String!) on ENUM_VALUE
+
+directive @join__implements(graph: join__Graph!, interface: String!) repeatable on OBJECT | INTERFACE
+
+directive @join__type(graph: join__Graph!, key: join__FieldSet, extension: Boolean! = false, resolvable: Boolean! = true, isInterfaceObject: Boolean! = false) repeatable on OBJECT | INTERFACE | UNION | ENUM | INPUT_OBJECT | SCALAR
+
+directive @join__unionMember(graph: join__Graph!, member: String!) repeatable on UNION
+
+directive @link(url: String, as: String, for: link__Purpose, import: [link__Import]) repeatable on SCHEMA
+
+union AssignRoleResult
+  @join__type(graph: USER_SERVICE)
+  @join__unionMember(graph: USER_SERVICE, member: "AssignRoleSuccess")
+  @join__unionMember(graph: USER_SERVICE, member: "UserNotFoundError")
+  @join__unionMember(graph: USER_SERVICE, member: "RoleNotFoundError")
+  @join__unionMember(graph: USER_SERVICE, member: "RoleAlreadyAssignedError")
+ = AssignRoleSuccess | UserNotFoundError | RoleNotFoundError | RoleAlreadyAssignedError
+
+"""Returned when a role is successfully assigned to a user."""
+type AssignRoleSuccess
+  @join__type(graph: USER_SERVICE)
+{
+  """The user with updated roles."""
+  user: User!
+
+  """A human-readable success message."""
+  message: String!
+}
+
+"""Input for assigning a role to a user."""
+input AssignRoleToUserInput
+  @join__type(graph: USER_SERVICE)
+{
+  """ID of the user to assign the role to."""
+  userId: ID!
+
+  """ID of the role to assign."""
+  roleId: ID!
+}
+
+"""A single audit log entry recording a security-relevant action."""
+type AuditLog
+  @join__type(graph: USER_SERVICE)
+{
+  """Unique identifier for the audit log entry."""
+  id: ID!
+
+  """
+  The ID of the user who performed the action. Null for unauthenticated actions.
+  """
+  userId: String
+
+  """The action that was performed (e.g. USER_LOGIN_SUCCESS)."""
+  action: String!
+
+  """
+  The type of the entity that was affected (e.g. User, UserRoleAssignment).
+  """
+  targetType: String!
+
+  """
+  The ID of the entity that was affected. Null when there is no specific target.
+  """
+  targetId: String
+
+  """
+  Action-specific context serialized as a JSON string (e.g. email, fields changed, or related IDs).
+  """
+  metadata: String
+
+  """IP address of the request originator."""
+  ipAddress: String
+
+  """User-Agent header from the request."""
+  userAgent: String
+
+  """Timestamp when the audit entry was created."""
+  createdAt: DateTime!
+}
+
+"""Filter options for querying audit logs."""
+input AuditLogFilterInput
+  @join__type(graph: USER_SERVICE)
+{
+  """Filter by the ID of the user who performed the action."""
+  userId: String
+
+  """Filter by action type (e.g. USER_LOGIN_SUCCESS)."""
+  action: String
+
+  """Return only entries created at or after this ISO 8601 timestamp."""
+  from: String
+
+  """Return only entries created at or before this ISO 8601 timestamp."""
+  to: String
+}
+
+"""Returned when an admin attempts to block their own account."""
+type CannotBlockSelfError
+  @join__type(graph: USER_SERVICE)
+{
+  """A human-readable error message."""
+  message: String!
+}
+
+"""
+Input for changing the authenticated user password. Requires current password validation.
+"""
+input ChangePasswordInput
+  @join__type(graph: USER_SERVICE)
+{
+  """The user current password."""
+  currentPassword: String!
+
+  """The new password to set."""
+  newPassword: String!
+}
+
+"""Returned when the provided current password is incorrect."""
+type ChangePasswordInvalidCurrentPasswordError
+  @join__type(graph: USER_SERVICE)
+{
+  """Error message."""
+  message: String!
+}
+
+"""Returned when the new password matches a recently used password."""
+type ChangePasswordPasswordReusedError
+  @join__type(graph: USER_SERVICE)
+{
+  """Error message."""
+  message: String!
+}
+
+union ChangePasswordResult
+  @join__type(graph: USER_SERVICE)
+  @join__unionMember(graph: USER_SERVICE, member: "ChangePasswordSuccess")
+  @join__unionMember(graph: USER_SERVICE, member: "ChangePasswordInvalidCurrentPasswordError")
+  @join__unionMember(graph: USER_SERVICE, member: "ChangePasswordPasswordReusedError")
+ = ChangePasswordSuccess | ChangePasswordInvalidCurrentPasswordError | ChangePasswordPasswordReusedError
+
+"""Returned on successful password change."""
+type ChangePasswordSuccess
+  @join__type(graph: USER_SERVICE)
+{
+  """Confirmation message."""
+  message: String!
+}
+
+"""Input for creating a custom permission."""
+input CreatePermissionInput
+  @join__type(graph: USER_SERVICE)
+{
+  """
+  The resource this permission applies to. Lowercase alphanumeric with hyphens only.
+  """
+  resource: String!
+
+  """The action allowed on the resource."""
+  action: PermissionAction!
+
+  """Human-readable explanation of what this permission grants."""
+  description: String
+}
+
+union CreatePermissionResult
+  @join__type(graph: USER_SERVICE)
+  @join__unionMember(graph: USER_SERVICE, member: "CreatePermissionSuccess")
+  @join__unionMember(graph: USER_SERVICE, member: "PermissionAlreadyExistsError")
+ = CreatePermissionSuccess | PermissionAlreadyExistsError
+
+"""Returned when a permission is successfully created."""
+type CreatePermissionSuccess
+  @join__type(graph: USER_SERVICE)
+{
+  """The newly created permission."""
+  permission: Permission!
+
+  """A human-readable success message."""
+  message: String!
+}
+
+"""Input for creating a custom role."""
+input CreateRoleInput
+  @join__type(graph: USER_SERVICE)
+{
+  """Unique name for the role. Lowercase alphanumeric with hyphens only."""
+  name: String!
+
+  """Human-readable explanation of what this role grants."""
+  description: String
+
+  """
+  List of permission IDs to assign to this role. Must contain at least one.
+  """
+  permissionIds: [ID!]!
+}
+
+union CreateRoleResult
+  @join__type(graph: USER_SERVICE)
+  @join__unionMember(graph: USER_SERVICE, member: "CreateRoleSuccess")
+  @join__unionMember(graph: USER_SERVICE, member: "RoleNameAlreadyExistsError")
+  @join__unionMember(graph: USER_SERVICE, member: "PermissionsNotFoundError")
+ = CreateRoleSuccess | RoleNameAlreadyExistsError | PermissionsNotFoundError
+
+"""Returned when a role is successfully created."""
+type CreateRoleSuccess
+  @join__type(graph: USER_SERVICE)
+{
+  """The newly created role."""
+  role: Role!
+
+  """A human-readable success message."""
+  message: String!
+}
+
+"""Cursor-paginated list of audit log entries."""
+type CursorPaginatedAuditLogResponse
+  @join__type(graph: USER_SERVICE)
+{
+  """The list of items for the current page."""
+  items: [AuditLog!]!
+
+  """Whether there are more items after this page."""
+  hasMore: Boolean!
+
+  """
+  Opaque cursor pointing to the last item. Pass as "after" to fetch the next page. Null when the result set is empty.
+  """
+  endCursor: String
+
+  """
+  Total number of items matching the filter. Only computed when this field is selected in the query.
+  """
+  total: Int
+}
+
+"""Cursor-paginated list of roles."""
+type CursorPaginatedRoleResponse
+  @join__type(graph: USER_SERVICE)
+{
+  """The list of items for the current page."""
+  items: [Role!]!
+
+  """Whether there are more items after this page."""
+  hasMore: Boolean!
+
+  """
+  Opaque cursor pointing to the last item. Pass as "after" to fetch the next page. Null when the result set is empty.
+  """
+  endCursor: String
+
+  """
+  Total number of items matching the filter. Only computed when this field is selected in the query.
+  """
+  total: Int
+}
+
+"""Cursor-paginated list of users."""
+type CursorPaginatedUserResponse
+  @join__type(graph: USER_SERVICE)
+{
+  """The list of items for the current page."""
+  items: [User!]!
+
+  """Whether there are more items after this page."""
+  hasMore: Boolean!
+
+  """
+  Opaque cursor pointing to the last item. Pass as "after" to fetch the next page. Null when the result set is empty.
+  """
+  endCursor: String
+
+  """
+  Total number of items matching the filter. Only computed when this field is selected in the query.
+  """
+  total: Int
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+  @join__type(graph: USER_SERVICE)
+
+"""
+Input for self-service account deletion. Requires password confirmation.
+"""
+input DeleteMyAccountInput
+  @join__type(graph: USER_SERVICE)
+{
+  """Current password for identity confirmation."""
+  password: String!
+}
+
+"""
+Returned when the provided password is incorrect. Does not reveal account state.
+"""
+type DeleteMyAccountInvalidPasswordError
+  @join__type(graph: USER_SERVICE)
+{
+  """Error message."""
+  message: String!
+}
+
+union DeleteMyAccountResult
+  @join__type(graph: USER_SERVICE)
+  @join__unionMember(graph: USER_SERVICE, member: "DeleteMyAccountSuccess")
+  @join__unionMember(graph: USER_SERVICE, member: "DeleteMyAccountInvalidPasswordError")
+ = DeleteMyAccountSuccess | DeleteMyAccountInvalidPasswordError
+
+"""Returned when the account has been successfully deleted."""
+type DeleteMyAccountSuccess
+  @join__type(graph: USER_SERVICE)
+{
+  """Confirmation message."""
+  message: String!
+}
+
+"""
+Input for forcing a password reset on a user account. Used by customer support.
+"""
+input ForcePasswordResetInput
+  @join__type(graph: USER_SERVICE)
+{
+  """The ID of the user whose password should be forcefully reset."""
+  userId: ID!
+}
+
+union ForcePasswordResetResult
+  @join__type(graph: USER_SERVICE)
+  @join__unionMember(graph: USER_SERVICE, member: "ForcePasswordResetSuccess")
+  @join__unionMember(graph: USER_SERVICE, member: "ForcePasswordResetUserNotFoundError")
+ = ForcePasswordResetSuccess | ForcePasswordResetUserNotFoundError
+
+"""
+Returned when a password reset has been successfully forced for a user account.
+"""
+type ForcePasswordResetSuccess
+  @join__type(graph: USER_SERVICE)
+{
+  """A success message."""
+  message: String!
+}
+
+"""
+Returned when the target user was not found, is inactive, or has been deleted.
+"""
+type ForcePasswordResetUserNotFoundError
+  @join__type(graph: USER_SERVICE)
+{
+  """An error message describing the issue."""
+  message: String!
+}
+
+scalar join__FieldSet
+
+enum join__Graph {
+  USER_SERVICE @join__graph(name: "user-service", url: "http://localhost:3000/graphql")
+}
+
+scalar link__Import
+
+enum link__Purpose {
+  """
+  `SECURITY` features provide metadata necessary to securely resolve fields.
+  """
+  SECURITY
+
+  """
+  `EXECUTION` features provide metadata necessary for operation execution.
+  """
+  EXECUTION
+}
+
+"""
+Optional filters for the roles list query. Search matches across name and description with OR logic.
+"""
+input ListRolesFilterInput
+  @join__type(graph: USER_SERVICE)
+{
+  """
+  Case-insensitive partial match across role name and description (OR logic).
+  """
+  search: String
+
+  """
+  Filter by system/custom role type. True returns only system roles, false returns only custom roles.
+  """
+  isSystem: Boolean
+
+  """Filter by active/inactive status (exact match)."""
+  isActive: Boolean
+}
+
+"""
+Optional filters for the users list query. Search matches across email, firstName, and lastName with OR logic.
+"""
+input ListUsersFilterInput
+  @join__type(graph: USER_SERVICE)
+{
+  """
+  Case-insensitive partial match across email, firstName, and lastName (OR logic).
+  """
+  search: String
+
+  """Filter by active/inactive status (exact match)."""
+  isActive: Boolean
+}
+
+"""Credentials for authenticating a user."""
+input LoginInput
+  @join__type(graph: USER_SERVICE)
+{
+  """The email address associated with the account."""
+  email: String!
+
+  """The account password."""
+  password: String!
+}
+
+"""
+Returned when authentication fails. Does not reveal whether the email exists.
+"""
+type LoginInvalidCredentialsError
+  @join__type(graph: USER_SERVICE)
+{
+  """A generic error message."""
+  message: String!
+}
+
+union LoginResult
+  @join__type(graph: USER_SERVICE)
+  @join__unionMember(graph: USER_SERVICE, member: "LoginSuccess")
+  @join__unionMember(graph: USER_SERVICE, member: "LoginInvalidCredentialsError")
+ = LoginSuccess | LoginInvalidCredentialsError
+
+"""Returned on successful authentication."""
+type LoginSuccess
+  @join__type(graph: USER_SERVICE)
+{
+  """Short-lived JWT access token."""
+  accessToken: String!
+
+  """Long-lived opaque refresh token."""
+  refreshToken: String!
+
+  """The authenticated user profile."""
+  user: User!
+}
+
+"""Returned when all active sessions are logged out for the current user."""
+type LogoutAllSuccess
+  @join__type(graph: USER_SERVICE)
+{
+  """Confirmation message."""
+  message: String!
+
+  """Number of active refresh tokens that were revoked."""
+  revokedCount: Int!
+}
+
+"""Input for revoking a refresh token to end the current session."""
+input LogoutInput
+  @join__type(graph: USER_SERVICE)
+{
+  """The refresh token to revoke."""
+  refreshToken: String!
+}
+
+"""Returned on successful logout."""
+type LogoutSuccess
+  @join__type(graph: USER_SERVICE)
+{
+  """Confirmation message."""
+  message: String!
+}
+
+type Mutation
+  @join__type(graph: USER_SERVICE)
+{
+  """
+  Register a new user account. Returns a union of success or error types.
+  """
+  signup(input: SignupInput!): SignupResult!
+
+  """Soft-deletes a user by ID. Requires admin access."""
+  deleteUser(id: ID!): Boolean!
+
+  """
+  Delete your own account. Requires password confirmation. Soft-deletes the account and revokes all sessions.
+  """
+  deleteMyAccount(input: DeleteMyAccountInput!): DeleteMyAccountResult!
+
+  """
+  Update any user account. Admin-only. Can change name, active status, and email verification.
+  """
+  updateUser(input: UpdateUserInput!): UpdateUserResult!
+
+  """Update your own profile. Only firstName and lastName can be changed."""
+  updateMyProfile(input: UpdateMyProfileInput!): UpdateMyProfileResult!
+
+  """Assign an existing role to a user. Requires admin access."""
+  assignRoleToUser(input: AssignRoleToUserInput!): AssignRoleResult!
+
+  """Remove a role from a user. Requires admin access."""
+  removeRoleFromUser(input: RemoveRoleFromUserInput!): RemoveRoleResult!
+
+  """Create a custom permission. Requires the permission:manage permission."""
+  createPermission(input: CreatePermissionInput!): CreatePermissionResult!
+
+  """
+  Create a custom role with one or more permissions. Requires the role:manage permission.
+  """
+  createRole(input: CreateRoleInput!): CreateRoleResult!
+
+  """
+  Update a role's description, active status, or permissions. Requires role:manage permission.
+  """
+  updateRole(input: UpdateRoleInput!): UpdateRoleResult!
+
+  """
+  Authenticate a user with email and password. Returns tokens on success.
+  """
+  login(input: LoginInput!): LoginResult!
+
+  """
+  Request a password reset email. Always returns success to prevent email enumeration.
+  """
+  requestPasswordReset(input: RequestPasswordResetInput!): RequestPasswordResetSuccess!
+
+  """
+  Reset a password using a valid reset token. Returns success or a specific error.
+  """
+  resetPassword(input: ResetPasswordInput!): ResetPasswordResult!
+
+  """
+  Force a password reset for a user account. Sends a reset email to the user. Requires user:update-any permission.
+  """
+  forcePasswordReset(input: ForcePasswordResetInput!): ForcePasswordResetResult!
+
+  """
+  Verify an email address using a verification token. Returns success or a specific error.
+  """
+  verifyEmail(input: VerifyEmailInput!): VerifyEmailResult!
+
+  """
+  Request a new verification email. Always returns success to prevent email enumeration.
+  """
+  resendVerificationEmail(input: ResendVerificationEmailInput!): ResendVerificationEmailSuccess!
+
+  """
+  Exchange a valid refresh token for a new access + refresh token pair. Implements token rotation with reuse detection.
+  """
+  refreshToken(input: RefreshTokenInput!): RefreshTokenResult!
+
+  """Revoke the provided refresh token, ending the current session."""
+  logout(input: LogoutInput!): LogoutSuccess!
+
+  """
+  Revoke all active refresh tokens for the current user, signing out everywhere.
+  """
+  logoutAll: LogoutAllSuccess!
+
+  """
+  Change the authenticated user password. Requires current password validation. Revokes all refresh tokens on success.
+  """
+  changePassword(input: ChangePasswordInput!): ChangePasswordResult!
+}
+
+"""Returned when no updatable fields are provided in the update input."""
+type NoChangesProvidedError
+  @join__type(graph: USER_SERVICE)
+{
+  """A human-readable error message."""
+  message: String!
+}
+
+"""A single allowed action on a specific resource."""
+type Permission
+  @join__type(graph: USER_SERVICE)
+{
+  """Unique identifier for the permission."""
+  id: ID!
+
+  """The resource this permission applies to (e.g., "user", "role")."""
+  resource: String!
+
+  """The action allowed on the resource (e.g., "read", "create", "delete")."""
+  action: String!
+
+  """Human-readable explanation of what this permission grants."""
+  description: String
+
+  """
+  Whether this permission was created by the system seed. System permissions cannot be modified.
+  """
+  isSystem: Boolean!
+
+  """Timestamp of permission creation."""
+  createdAt: DateTime!
+
+  """Timestamp of last permission update."""
+  updatedAt: DateTime!
+}
+
+"""The set of allowed actions that can be granted on a resource."""
+enum PermissionAction
+  @join__type(graph: USER_SERVICE)
+{
+  CREATE @join__enumValue(graph: USER_SERVICE)
+  READ @join__enumValue(graph: USER_SERVICE)
+  UPDATE @join__enumValue(graph: USER_SERVICE)
+  DELETE @join__enumValue(graph: USER_SERVICE)
+  READ_OWN @join__enumValue(graph: USER_SERVICE)
+  READ_ANY @join__enumValue(graph: USER_SERVICE)
+  CREATE_OWN @join__enumValue(graph: USER_SERVICE)
+  CREATE_ANY @join__enumValue(graph: USER_SERVICE)
+  UPDATE_OWN @join__enumValue(graph: USER_SERVICE)
+  UPDATE_ANY @join__enumValue(graph: USER_SERVICE)
+  DELETE_OWN @join__enumValue(graph: USER_SERVICE)
+  DELETE_ANY @join__enumValue(graph: USER_SERVICE)
+  ASSIGN_ANY @join__enumValue(graph: USER_SERVICE)
+  UNASSIGN_ANY @join__enumValue(graph: USER_SERVICE)
+  MANAGE @join__enumValue(graph: USER_SERVICE)
+}
+
+"""
+Returned when a permission with the same resource and action already exists.
+"""
+type PermissionAlreadyExistsError
+  @join__type(graph: USER_SERVICE)
+{
+  """A human-readable error message."""
+  message: String!
+}
+
+"""Returned when one or more permission IDs provided do not exist."""
+type PermissionsNotFoundError
+  @join__type(graph: USER_SERVICE)
+{
+  """A human-readable error message."""
+  message: String!
+
+  """The permission IDs that were not found."""
+  permissionIds: [String!]!
+}
+
+type Query
+  @join__type(graph: USER_SERVICE)
+{
+  """
+  Returns a cursor-paginated, filterable list of audit log entries. Requires audit:read permission.
+  """
+  auditLogs(
+    """Number of items to return. Min 1, max 100."""
+    first: Int! = 20
+
+    """
+    Opaque cursor. Pass the endCursor from a previous response to fetch the next page.
+    """
+    after: String = null
+    filter: AuditLogFilterInput
+  ): CursorPaginatedAuditLogResponse!
+
+  """
+  Returns the authenticated user's own profile data including assigned roles and permissions.
+  """
+  me: User!
+
+  """
+  Returns a cursor-paginated, filterable list of all users. Requires admin access.
+  """
+  users(
+    """Number of items to return. Min 1, max 100."""
+    first: Int! = 20
+
+    """
+    Opaque cursor. Pass the endCursor from a previous response to fetch the next page.
+    """
+    after: String = null
+    filter: ListUsersFilterInput
+  ): CursorPaginatedUserResponse!
+
+  """
+  Returns any user's full profile data including assigned roles and permissions, by ID. Requires admin access.
+  """
+  user(id: ID!): User
+
+  """
+  Returns a cursor-paginated, filterable list of all roles including their permissions. Requires role:manage permission.
+  """
+  roles(
+    """Number of items to return. Min 1, max 100."""
+    first: Int! = 20
+
+    """
+    Opaque cursor. Pass the endCursor from a previous response to fetch the next page.
+    """
+    after: String = null
+    filter: ListRolesFilterInput
+  ): CursorPaginatedRoleResponse!
+
+  """
+  Returns the full details of a role by ID, including permissions and user count. Requires role:manage permission.
+  """
+  role(id: ID!): RoleDetailResult!
+}
+
+"""Returned when the refresh token has expired."""
+type RefreshTokenExpiredError
+  @join__type(graph: USER_SERVICE)
+{
+  """A message describing the error."""
+  message: String!
+}
+
+"""
+Input for exchanging a refresh token for a new access + refresh token pair.
+"""
+input RefreshTokenInput
+  @join__type(graph: USER_SERVICE)
+{
+  """The opaque refresh token issued during login or a previous refresh."""
+  refreshToken: String!
+}
+
+"""Returned when the refresh token is invalid or not recognized."""
+type RefreshTokenInvalidError
+  @join__type(graph: USER_SERVICE)
+{
+  """A message describing the error."""
+  message: String!
+}
+
+union RefreshTokenResult
+  @join__type(graph: USER_SERVICE)
+  @join__unionMember(graph: USER_SERVICE, member: "LoginSuccess")
+  @join__unionMember(graph: USER_SERVICE, member: "RefreshTokenRevokedError")
+  @join__unionMember(graph: USER_SERVICE, member: "RefreshTokenExpiredError")
+  @join__unionMember(graph: USER_SERVICE, member: "RefreshTokenInvalidError")
+ = LoginSuccess | RefreshTokenRevokedError | RefreshTokenExpiredError | RefreshTokenInvalidError
+
+"""
+Returned when the refresh token has been revoked. Possible token theft detected — all tokens in the family have been invalidated.
+"""
+type RefreshTokenRevokedError
+  @join__type(graph: USER_SERVICE)
+{
+  """A message describing the error."""
+  message: String!
+}
+
+"""Input for removing a role from a user."""
+input RemoveRoleFromUserInput
+  @join__type(graph: USER_SERVICE)
+{
+  """ID of the user to remove the role from."""
+  userId: ID!
+
+  """ID of the role to remove."""
+  roleId: ID!
+}
+
+union RemoveRoleResult
+  @join__type(graph: USER_SERVICE)
+  @join__unionMember(graph: USER_SERVICE, member: "RemoveRoleSuccess")
+  @join__unionMember(graph: USER_SERVICE, member: "RoleAssignmentNotFoundError")
+  @join__unionMember(graph: USER_SERVICE, member: "UserNotFoundError")
+ = RemoveRoleSuccess | RoleAssignmentNotFoundError | UserNotFoundError
+
+"""Returned when a role is successfully removed from a user."""
+type RemoveRoleSuccess
+  @join__type(graph: USER_SERVICE)
+{
+  """The user with updated roles."""
+  user: User!
+
+  """A human-readable success message."""
+  message: String!
+}
+
+"""Input for requesting a password reset email."""
+input RequestPasswordResetInput
+  @join__type(graph: USER_SERVICE)
+{
+  """The email address associated with the account."""
+  email: String!
+}
+
+"""
+Returned when a password reset request is processed. Always returns success to prevent email enumeration.
+"""
+type RequestPasswordResetSuccess
+  @join__type(graph: USER_SERVICE)
+{
+  """A generic success message."""
+  message: String!
+}
+
+"""Input for requesting a new verification email."""
+input ResendVerificationEmailInput
+  @join__type(graph: USER_SERVICE)
+{
+  """The email address associated with the account."""
+  email: String!
+}
+
+"""
+Returned when a verification email resend request is processed. Always returns success to prevent email enumeration.
+"""
+type ResendVerificationEmailSuccess
+  @join__type(graph: USER_SERVICE)
+{
+  """A generic success message."""
+  message: String!
+}
+
+"""Input for resetting a password using a valid reset token."""
+input ResetPasswordInput
+  @join__type(graph: USER_SERVICE)
+{
+  """The password reset token received via email."""
+  token: String!
+
+  """The new password to set for the account."""
+  newPassword: String!
+}
+
+"""
+Returned when the provided reset token is invalid or has already been used.
+"""
+type ResetPasswordInvalidTokenError
+  @join__type(graph: USER_SERVICE)
+{
+  """An error message describing the issue."""
+  message: String!
+}
+
+"""Returned when the new password matches a recently used password."""
+type ResetPasswordPasswordReusedError
+  @join__type(graph: USER_SERVICE)
+{
+  """An error message describing the issue."""
+  message: String!
+}
+
+union ResetPasswordResult
+  @join__type(graph: USER_SERVICE)
+  @join__unionMember(graph: USER_SERVICE, member: "ResetPasswordSuccess")
+  @join__unionMember(graph: USER_SERVICE, member: "ResetPasswordInvalidTokenError")
+  @join__unionMember(graph: USER_SERVICE, member: "ResetPasswordTokenExpiredError")
+  @join__unionMember(graph: USER_SERVICE, member: "ResetPasswordPasswordReusedError")
+ = ResetPasswordSuccess | ResetPasswordInvalidTokenError | ResetPasswordTokenExpiredError | ResetPasswordPasswordReusedError
+
+"""Returned when a password has been successfully reset."""
+type ResetPasswordSuccess
+  @join__type(graph: USER_SERVICE)
+{
+  """A success message."""
+  message: String!
+}
+
+"""Returned when the provided reset token has expired."""
+type ResetPasswordTokenExpiredError
+  @join__type(graph: USER_SERVICE)
+{
+  """An error message describing the issue."""
+  message: String!
+}
+
+"""A named collection of permissions assignable to users."""
+type Role
+  @join__type(graph: USER_SERVICE)
+{
+  """Unique identifier for the role."""
+  id: ID!
+
+  """Unique name of the role (e.g., "super_admin", "member")."""
+  name: String!
+
+  """Human-readable description of the role purpose."""
+  description: String
+
+  """
+  Whether this is a system-defined role that cannot be deleted via the API.
+  """
+  isSystem: Boolean!
+
+  """Whether this role is currently active and can be assigned."""
+  isActive: Boolean!
+
+  """The set of permissions granted by this role."""
+  permissions: [Permission!]!
+
+  """Timestamp of role creation."""
+  createdAt: DateTime!
+
+  """Timestamp of last role update."""
+  updatedAt: DateTime!
+}
+
+"""Returned when the role is already assigned to the user."""
+type RoleAlreadyAssignedError
+  @join__type(graph: USER_SERVICE)
+{
+  """A human-readable error message."""
+  message: String!
+}
+
+"""
+Returned when the role assignment does not exist for the given user and role.
+"""
+type RoleAssignmentNotFoundError
+  @join__type(graph: USER_SERVICE)
+{
+  """A human-readable error message."""
+  message: String!
+}
+
+"""
+Detailed view of a role including permissions and user assignment count.
+"""
+type RoleDetail
+  @join__type(graph: USER_SERVICE)
+{
+  """Unique identifier for the role."""
+  id: ID!
+
+  """Unique name of the role (e.g., "super_admin", "member")."""
+  name: String!
+
+  """Human-readable description of the role purpose."""
+  description: String
+
+  """
+  Whether this is a system-defined role that cannot be deleted via the API.
+  """
+  isSystem: Boolean!
+
+  """Whether this role is currently active and can be assigned."""
+  isActive: Boolean!
+
+  """The set of permissions granted by this role."""
+  permissions: [Permission!]!
+
+  """Number of non-deleted users currently assigned to this role."""
+  userCount: Int!
+
+  """Timestamp of role creation."""
+  createdAt: DateTime!
+
+  """Timestamp of last role update."""
+  updatedAt: DateTime!
+}
+
+union RoleDetailResult
+  @join__type(graph: USER_SERVICE)
+  @join__unionMember(graph: USER_SERVICE, member: "RoleDetailSuccess")
+  @join__unionMember(graph: USER_SERVICE, member: "RoleNotFoundError")
+ = RoleDetailSuccess | RoleNotFoundError
+
+"""Returned when a role is successfully retrieved with details."""
+type RoleDetailSuccess
+  @join__type(graph: USER_SERVICE)
+{
+  """The role with full details including permissions and user count."""
+  role: RoleDetail!
+}
+
+"""Returned when a role with the same name already exists."""
+type RoleNameAlreadyExistsError
+  @join__type(graph: USER_SERVICE)
+{
+  """A human-readable error message."""
+  message: String!
+}
+
+"""Returned when the requested role does not exist."""
+type RoleNotFoundError
+  @join__type(graph: USER_SERVICE)
+{
+  """A human-readable error message."""
+  message: String!
+
+  """The role ID that was not found."""
+  roleId: String!
+}
+
+"""
+Returned when signup cannot be completed. Does not reveal whether the email is already registered.
+"""
+type SignupEmailAlreadyTakenError
+  @join__type(graph: USER_SERVICE)
+{
+  """A generic error message that does not leak email existence."""
+  message: String!
+}
+
+"""Input for creating a new user account."""
+input SignupInput
+  @join__type(graph: USER_SERVICE)
+{
+  """Email address for the new account."""
+  email: String!
+
+  """
+  Password must be at least 8 characters with uppercase, lowercase, and digit.
+  """
+  password: String!
+
+  """Must match the password field."""
+  passwordConfirmation: String!
+
+  """User's first name."""
+  firstName: String!
+
+  """User's last name."""
+  lastName: String!
+
+  """
+  Optional JSON metadata to store on the user profile. Must be a JSON object string, max 10KB.
+  """
+  metadata: String
+}
+
+union SignupResult
+  @join__type(graph: USER_SERVICE)
+  @join__unionMember(graph: USER_SERVICE, member: "SignupSuccess")
+  @join__unionMember(graph: USER_SERVICE, member: "SignupEmailAlreadyTakenError")
+  @join__unionMember(graph: USER_SERVICE, member: "SignupValidationError")
+ = SignupSuccess | SignupEmailAlreadyTakenError | SignupValidationError
+
+"""Returned when a user account is created successfully."""
+type SignupSuccess
+  @join__type(graph: USER_SERVICE)
+{
+  """The newly created user."""
+  user: User!
+
+  """A human-readable success message."""
+  message: String!
+}
+
+"""Returned when the signup input fails validation."""
+type SignupValidationError
+  @join__type(graph: USER_SERVICE)
+{
+  """A human-readable validation message."""
+  message: String!
+
+  """List of validation error details."""
+  errors: [String!]!
+}
+
+"""
+Returned when attempting to deactivate a system role, which is not allowed.
+"""
+type SystemRoleProtectionError
+  @join__type(graph: USER_SERVICE)
+{
+  """A human-readable error message."""
+  message: String!
+}
+
+"""Input for a user updating their own profile."""
+input UpdateMyProfileInput
+  @join__type(graph: USER_SERVICE)
+{
+  """User's first name."""
+  firstName: String
+
+  """User's last name."""
+  lastName: String
+
+  """
+  JSON metadata to shallow-merge with existing metadata. Pass null to clear. Must be a JSON object string, max 10KB.
+  """
+  metadata: String
+}
+
+union UpdateMyProfileResult
+  @join__type(graph: USER_SERVICE)
+  @join__unionMember(graph: USER_SERVICE, member: "UpdateMyProfileSuccess")
+  @join__unionMember(graph: USER_SERVICE, member: "UserNotFoundError")
+ = UpdateMyProfileSuccess | UserNotFoundError
+
+"""Returned when a user updates their own profile successfully."""
+type UpdateMyProfileSuccess
+  @join__type(graph: USER_SERVICE)
+{
+  """The updated user."""
+  user: User!
+
+  """A human-readable success message."""
+  message: String!
+}
+
+"""
+Input for updating a role. At least one optional field must be provided.
+"""
+input UpdateRoleInput
+  @join__type(graph: USER_SERVICE)
+{
+  """The ID of the role to update."""
+  roleId: ID!
+
+  """Updated description. Pass null to clear. Omit to leave unchanged."""
+  description: String
+
+  """Whether the role is active. System roles cannot be deactivated."""
+  isActive: Boolean
+
+  """
+  Full replacement list of permission IDs. Must contain at least one when provided.
+  """
+  permissionIds: [ID!]
+}
+
+union UpdateRoleResult
+  @join__type(graph: USER_SERVICE)
+  @join__unionMember(graph: USER_SERVICE, member: "UpdateRoleSuccess")
+  @join__unionMember(graph: USER_SERVICE, member: "RoleNotFoundError")
+  @join__unionMember(graph: USER_SERVICE, member: "PermissionsNotFoundError")
+  @join__unionMember(graph: USER_SERVICE, member: "NoChangesProvidedError")
+  @join__unionMember(graph: USER_SERVICE, member: "SystemRoleProtectionError")
+ = UpdateRoleSuccess | RoleNotFoundError | PermissionsNotFoundError | NoChangesProvidedError | SystemRoleProtectionError
+
+"""Returned when a role is successfully updated."""
+type UpdateRoleSuccess
+  @join__type(graph: USER_SERVICE)
+{
+  """The updated role."""
+  role: Role!
+
+  """A human-readable success message."""
+  message: String!
+}
+
+"""Admin input for updating a user account."""
+input UpdateUserInput
+  @join__type(graph: USER_SERVICE)
+{
+  """ID of the user to update."""
+  id: ID!
+
+  """User's first name."""
+  firstName: String
+
+  """User's last name."""
+  lastName: String
+
+  """Whether the account is active. Setting to false blocks the user."""
+  isActive: Boolean
+
+  """
+  Whether the email is confirmed. true sets emailConfirmedAt to now, false sets it to null.
+  """
+  isEmailConfirmed: Boolean
+
+  """
+  JSON metadata to shallow-merge with existing metadata. Pass null to clear. Must be a JSON object string, max 10KB.
+  """
+  metadata: String
+}
+
+union UpdateUserResult
+  @join__type(graph: USER_SERVICE)
+  @join__unionMember(graph: USER_SERVICE, member: "UpdateUserSuccess")
+  @join__unionMember(graph: USER_SERVICE, member: "UserNotFoundError")
+  @join__unionMember(graph: USER_SERVICE, member: "CannotBlockSelfError")
+ = UpdateUserSuccess | UserNotFoundError | CannotBlockSelfError
+
+"""Returned when a user is updated successfully by an admin."""
+type UpdateUserSuccess
+  @join__type(graph: USER_SERVICE)
+{
+  """The updated user."""
+  user: User!
+
+  """A human-readable success message."""
+  message: String!
+}
+
+"""A registered user account."""
+type User
+  @join__type(graph: USER_SERVICE, key: "id")
+{
+  """Unique identifier for the user."""
+  id: ID!
+
+  """User's email address, used for login and communication."""
+  email: String!
+
+  """User's first name."""
+  firstName: String!
+
+  """User's last name."""
+  lastName: String!
+
+  """
+  Whether the account is active. False means the account is blocked or suspended.
+  """
+  isActive: Boolean!
+
+  """Timestamp of the user's most recent activity. Null if never seen."""
+  lastSeenAt: DateTime
+
+  """Timestamp of when the email was confirmed. Null means unconfirmed."""
+  emailConfirmedAt: DateTime
+
+  """Profile picture URL."""
+  avatarUrl: String
+
+  """Phone number for 2FA or SMS notifications."""
+  phoneNumber: String
+
+  """
+  Arbitrary JSON metadata stored on the user profile. Serialized as a JSON string.
+  """
+  metadata: String
+
+  """Roles assigned to this user via RBAC."""
+  roles: [UserRoleAssignment!]!
+
+  """
+  User's preferred locale (e.g., en-US, pt-BR) for i18n and email templates.
+  """
+  locale: String
+
+  """User's preferred timezone in IANA format (e.g., America/Sao_Paulo)."""
+  timezone: String
+
+  """Timestamp of account creation."""
+  createdAt: DateTime!
+
+  """Timestamp of last record update."""
+  updatedAt: DateTime!
+
+  """
+  Computed display name combining first and last name. Not stored in the database.
+  """
+  displayName: String!
+
+  """Whether the email has been confirmed. Derived from emailConfirmedAt."""
+  isEmailConfirmed: Boolean!
+}
+
+"""Returned when the target user does not exist."""
+type UserNotFoundError
+  @join__type(graph: USER_SERVICE)
+{
+  """A human-readable error message."""
+  message: String!
+}
+
+"""
+Represents the assignment of a role to a user, including audit metadata.
+"""
+type UserRoleAssignment
+  @join__type(graph: USER_SERVICE)
+{
+  """Unique identifier for this assignment."""
+  id: ID!
+
+  """The role assigned to the user."""
+  role: Role!
+
+  """Timestamp of when the role was assigned."""
+  assignedAt: DateTime!
+
+  """
+  The user who performed this assignment. Null for system-assigned roles.
+  """
+  assignedBy: User
+}
+
+"""
+Returned when the email associated with the token has already been verified.
+"""
+type VerifyEmailAlreadyVerifiedError
+  @join__type(graph: USER_SERVICE)
+{
+  """An error message describing the issue."""
+  message: String!
+}
+
+"""Input for verifying an email address using a verification token."""
+input VerifyEmailInput
+  @join__type(graph: USER_SERVICE)
+{
+  """The email verification token received via email."""
+  token: String!
+}
+
+"""Returned when the provided verification token is invalid."""
+type VerifyEmailInvalidTokenError
+  @join__type(graph: USER_SERVICE)
+{
+  """An error message describing the issue."""
+  message: String!
+}
+
+union VerifyEmailResult
+  @join__type(graph: USER_SERVICE)
+  @join__unionMember(graph: USER_SERVICE, member: "VerifyEmailSuccess")
+  @join__unionMember(graph: USER_SERVICE, member: "VerifyEmailInvalidTokenError")
+  @join__unionMember(graph: USER_SERVICE, member: "VerifyEmailTokenExpiredError")
+  @join__unionMember(graph: USER_SERVICE, member: "VerifyEmailAlreadyVerifiedError")
+ = VerifyEmailSuccess | VerifyEmailInvalidTokenError | VerifyEmailTokenExpiredError | VerifyEmailAlreadyVerifiedError
+
+"""Returned when an email has been successfully verified."""
+type VerifyEmailSuccess
+  @join__type(graph: USER_SERVICE)
+{
+  """A success message."""
+  message: String!
+}
+
+"""Returned when the provided verification token has expired."""
+type VerifyEmailTokenExpiredError
+  @join__type(graph: USER_SERVICE)
+{
+  """An error message describing the issue."""
+  message: String!
+}
