@@ -16,7 +16,11 @@ async function bootstrap() {
 
   app.enableCors({
     origin: config?.allowedOrigins || ['http://localhost:3002'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'apollo-require-preflight',
+    ],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
   });
