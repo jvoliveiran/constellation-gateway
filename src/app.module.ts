@@ -120,14 +120,23 @@ import { OtelWinstonTransport } from './observability/otel-winston-transport';
               req,
             }: {
               req: {
-                user?: { userId: string; permissions: string[] };
+                user?: {
+                  userId: string;
+                  email: string;
+                  permissions: string[];
+                  firstName: string;
+                  lastName: string;
+                };
                 headers: Record<string, string>;
                 ip?: string;
                 socket?: { remoteAddress?: string };
               };
             }) => ({
               userId: req.user?.userId,
+              email: req.user?.email,
               permissions: req.user?.permissions,
+              firstName: req.user?.firstName,
+              lastName: req.user?.lastName,
               authorization: req.headers?.authorization,
               correlationId: req.headers?.['x-correlation-id'],
               clientIp: req.ip || req.socket?.remoteAddress,
@@ -178,6 +187,9 @@ import { OtelWinstonTransport } from './observability/otel-winston-transport';
                 if (context.userId) {
                   request.http?.headers.set('userId', context.userId);
                 }
+                if (context.email) {
+                  request.http?.headers.set('email', context.email);
+                }
                 if (context.authorization) {
                   request.http?.headers.set(
                     'authorization',
@@ -189,6 +201,12 @@ import { OtelWinstonTransport } from './observability/otel-winston-transport';
                     'permissions',
                     JSON.stringify(context.permissions),
                   );
+                }
+                if (context.firstName) {
+                  request.http?.headers.set('firstName', context.firstName);
+                }
+                if (context.lastName) {
+                  request.http?.headers.set('lastName', context.lastName);
                 }
                 if (context.correlationId) {
                   request.http?.headers.set(

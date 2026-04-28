@@ -28,6 +28,8 @@ function createValidToken(payload: {
   sub: string;
   email: string;
   roles: string[];
+  firstName: string;
+  lastName: string;
 }): string {
   return sign(payload, TEST_SECRET, { expiresIn: '1h' });
 }
@@ -44,6 +46,8 @@ describe('JwtAuthMiddleware', () => {
       sub: 'user-42',
       email: 'user@test.com',
       roles: ['read', 'write'],
+      firstName: 'John',
+      lastName: 'Doe',
     });
     const req = {
       path: '/graphql',
@@ -57,7 +61,10 @@ describe('JwtAuthMiddleware', () => {
     expect(next).toHaveBeenCalled();
     expect((req as unknown as { user: unknown }).user).toEqual({
       userId: 'user-42',
+      email: 'user@test.com',
       permissions: ['read', 'write'],
+      firstName: 'John',
+      lastName: 'Doe',
     });
     expect(res.status).not.toHaveBeenCalled();
   });
@@ -100,7 +107,13 @@ describe('JwtAuthMiddleware', () => {
 
   it('returns 401 when token is expired', () => {
     const expiredToken = sign(
-      { sub: 'user-1', email: 'u@t.com', roles: [] },
+      {
+        sub: 'user-1',
+        email: 'u@t.com',
+        roles: [],
+        firstName: 'A',
+        lastName: 'B',
+      },
       TEST_SECRET,
       { expiresIn: '-1s' },
     );

@@ -39,7 +39,13 @@ describe('JwtAuthGuard', () => {
 
   it('should allow access with a valid token', () => {
     const token = sign(
-      { sub: 'user-123', email: 'u@t.com', roles: ['read'] },
+      {
+        sub: 'user-123',
+        email: 'u@t.com',
+        roles: ['read'],
+        firstName: 'John',
+        lastName: 'Doe',
+      },
       TEST_SECRET,
     );
     const context = createMockExecutionContext({
@@ -57,7 +63,13 @@ describe('JwtAuthGuard', () => {
 
   it('should throw UnauthorizedException for expired token', () => {
     const token = sign(
-      { sub: 'user-123', email: 'u@t.com', roles: [] },
+      {
+        sub: 'user-123',
+        email: 'u@t.com',
+        roles: [],
+        firstName: 'A',
+        lastName: 'B',
+      },
       TEST_SECRET,
       {
         expiresIn: -1,
@@ -95,7 +107,13 @@ describe('JwtAuthGuard', () => {
 
   it('should map sub→userId and roles→permissions on request', () => {
     const token = sign(
-      { sub: 'user-456', email: 'u@t.com', roles: ['admin'] },
+      {
+        sub: 'user-456',
+        email: 'admin@t.com',
+        roles: ['admin'],
+        firstName: 'Jane',
+        lastName: 'Smith',
+      },
       TEST_SECRET,
     );
     const context = createMockExecutionContext({
@@ -107,7 +125,10 @@ describe('JwtAuthGuard', () => {
     const request = context.switchToHttp().getRequest();
     expect(request.user).toEqual({
       userId: 'user-456',
+      email: 'admin@t.com',
       permissions: ['admin'],
+      firstName: 'Jane',
+      lastName: 'Smith',
     });
   });
 });

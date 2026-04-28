@@ -48,7 +48,10 @@ export class JwtAuthGuard implements CanActivate {
       const decoded = verify(token, secret) as UserServiceJwtPayload;
       request.user = {
         userId: decoded.sub,
+        email: decoded.email,
         permissions: decoded.roles,
+        firstName: decoded.firstName,
+        lastName: decoded.lastName,
       } satisfies GatewayUser;
       return true;
     } catch {

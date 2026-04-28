@@ -127,10 +127,13 @@ export class JwtAuthMiddleware implements NestMiddleware {
     decoded: UserServiceJwtPayload,
     next: NextFunction,
   ): void {
-    // Map user-service fields (sub, roles) to gateway internal representation (userId, permissions).
+    // Map user-service fields to gateway internal representation.
     (req as unknown as { user: GatewayUser }).user = {
       userId: decoded.sub,
+      email: decoded.email,
       permissions: decoded.roles,
+      firstName: decoded.firstName,
+      lastName: decoded.lastName,
     };
     next();
   }
